@@ -40,7 +40,8 @@ class GuestStore:
                 );
                 CREATE TABLE IF NOT EXISTS shares (
                     id TEXT PRIMARY KEY, profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-                    token_digest TEXT NOT NULL UNIQUE, pin_hash TEXT, enabled INTEGER NOT NULL, label TEXT NOT NULL DEFAULT '',
+                    token_digest TEXT NOT NULL UNIQUE, recovery_token_digest TEXT, pin_hash TEXT,
+                    enabled INTEGER NOT NULL, label TEXT NOT NULL DEFAULT '',
                     expires_at REAL NOT NULL, max_sessions INTEGER NOT NULL,
                     profile_revision INTEGER NOT NULL, created_at REAL NOT NULL,
                     revoked_reason TEXT NOT NULL DEFAULT '', revoked_by TEXT NOT NULL DEFAULT '', revoked_at REAL
@@ -68,6 +69,12 @@ class GuestStore:
                 connection.execute("ALTER TABLE shares ADD COLUMN revoked_by TEXT NOT NULL DEFAULT ''")
             if "revoked_at" not in columns:
                 connection.execute("ALTER TABLE shares ADD COLUMN revoked_at REAL")
+            if "recovery_token_digest" not in columns:
+                connection.execute("ALTER TABLE shares ADD COLUMN recovery_token_digest TEXT")
+            connection.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_shares_recovery_token "
+                "ON shares(recovery_token_digest) WHERE recovery_token_digest IS NOT NULL"
+            )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=10)
@@ -252,22 +259,31 @@ class GuestStore:
         raw_token = recoverable_share_token(self.token_key, share_id)
         with self._connect() as connection:
             connection.execute(
-                "INSERT INTO shares (id,profile_id,token_digest,pin_hash,enabled,label,expires_at,max_sessions,profile_revision,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                (share_id, profile_id, token_digest(self.token_key, raw_token), hash_pin(pin),
+                "INSERT INTO shares (id,profile_id,token_digest,recovery_token_digest,pin_hash,enabled,label,expires_at,max_sessions,profile_revision,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (share_id, profile_id, token_digest(self.token_key, raw_token),
+                 token_digest(self.token_key, raw_token), hash_pin(pin),
                  1, label, float(expires_at), int(max_sessions), int(profile["revision"]), now),
             )
         return self.get_share(share_id), raw_token
 
     def recover_share_token(self, share_id: str) -> str:
         candidate = recoverable_share_token(self.token_key, share_id)
-        with self._connect() as connection:
+        candidate_digest = token_digest(self.token_key, candidate)
+        with self._lock, self._connect() as connection:
             row = connection.execute(
-                "SELECT token_digest FROM shares WHERE id=?", (share_id,)
+                "SELECT token_digest,recovery_token_digest FROM shares WHERE id=?", (share_id,)
             ).fetchone()
-        if row is None:
-            raise KeyError(share_id)
-        if not hmac.compare_digest(str(row["token_digest"]), token_digest(self.token_key, candidate)):
-            raise StoreError("legacy_token_unrecoverable")
+            if row is None:
+                raise KeyError(share_id)
+            primary_matches = hmac.compare_digest(str(row["token_digest"]), candidate_digest)
+            recovery_matches = bool(row["recovery_token_digest"]) and hmac.compare_digest(
+                str(row["recovery_token_digest"]), candidate_digest
+            )
+            if not primary_matches and not recovery_matches:
+                connection.execute(
+                    "UPDATE shares SET recovery_token_digest=? WHERE id=?",
+                    (candidate_digest, share_id),
+                )
         return candidate
 
     def token_fingerprint(self, raw_token: str) -> str:
@@ -304,7 +320,10 @@ class GuestStore:
         digest, now = token_digest(self.token_key, raw_token), _now()
         with self._lock, self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            share = connection.execute("SELECT * FROM shares WHERE token_digest=?", (digest,)).fetchone()
+            share = connection.execute(
+                "SELECT * FROM shares WHERE token_digest=? OR recovery_token_digest=?",
+                (digest, digest),
+            ).fetchone()
             if share is None or not share["enabled"] or share["expires_at"] <= now:
                 raise StoreError("share_unavailable")
             profile = connection.execute("SELECT * FROM profiles WHERE id=?", (share["profile_id"],)).fetchone()

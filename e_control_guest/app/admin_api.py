@@ -14,6 +14,7 @@ from .dashboard_client import DashboardUnavailable
 from .importer import inspect_dashboard, snapshot
 from .policy import ACTION_CATALOG, PolicyDenied, authorize
 from .runtime import Runtime
+from .storage import StoreError
 from .web import install_http_guards
 
 STATIC = Path(__file__).with_name("static")

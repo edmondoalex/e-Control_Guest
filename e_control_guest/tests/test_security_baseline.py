@@ -7,7 +7,7 @@ import uuid
 from fastapi.testclient import TestClient
 
 from app.audit import AuditLog
-from app.crypto import hash_pin, verify_pin
+from app.crypto import hash_pin, token_digest, verify_pin
 from app.guest_api import create_guest_app
 from app.importer import inspect_dashboard, snapshot
 from app.policy import PolicyDenied, authorize
@@ -195,6 +195,26 @@ def test_new_share_token_can_be_recovered_without_plaintext_storage(tmp_path):
     share, token, _ = provision(runtime)
     assert runtime.store.recover_share_token(share["id"]) == token
     assert token.encode() not in (tmp_path / "guest.db").read_bytes()
+
+
+def test_legacy_share_gets_recoverable_alias_without_invalidating_original(tmp_path):
+    runtime, _ = make_runtime(tmp_path)
+    share, generated_token, _ = provision(runtime)
+    legacy_token = "legacy-token-created-before-rc23"
+    with sqlite3.connect(tmp_path / "guest.db") as connection:
+        connection.execute(
+            "UPDATE shares SET token_digest=?, recovery_token_digest=NULL WHERE id=?",
+            (token_digest(runtime.store.token_key, legacy_token), share["id"]),
+        )
+
+    recovered_token = runtime.store.recover_share_token(share["id"])
+    assert recovered_token == generated_token
+    assert recovered_token != legacy_token
+    with TestClient(create_guest_app(runtime), base_url="http://guest.test") as client:
+        login(client, legacy_token)
+        client.post("/api/guest/logout", headers={"X-eControl-CSRF": client.cookies.get("ecg_csrf", "")})
+    with TestClient(create_guest_app(runtime), base_url="http://guest.test") as client:
+        login(client, recovered_token)
 
 
 def test_audit_chain_detects_tampering(tmp_path):
