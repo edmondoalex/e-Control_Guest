@@ -123,6 +123,27 @@ def test_guest_flow_revocation_idempotency_and_audit(tmp_path):
     assert "command_request" in actions and "command_readback" in actions and "session_check" in actions
 
 
+def test_link_and_active_session_survive_profile_changes_until_manual_revoke(tmp_path):
+    runtime, _ = make_runtime(tmp_path)
+    share, token, card = provision(runtime)
+    runtime.store.update_card_permissions(card["id"], {
+        "light.sala": {"read": True, "actions": ["turn_on"], "limits": {}}
+    })
+    assert runtime.store.list_shares()[0]["revision_valid"] == 1
+    with TestClient(create_guest_app(runtime), base_url="http://guest.test") as client:
+        login(client, token)
+        runtime.store.update_card_permissions(card["id"], {
+            "light.sala": {"read": True, "actions": [], "limits": {}}
+        })
+        assert client.get("/api/guest/dashboard").status_code == 200
+        runtime.store.delete_card(card["id"])
+        dashboard = client.get("/api/guest/dashboard")
+        assert dashboard.status_code == 200
+        assert dashboard.json()["cards"] == []
+        runtime.store.revoke_share(share["id"], reason="Fine accesso", actor_id="admin")
+        assert client.get("/api/guest/dashboard").status_code == 401
+
+
 def test_token_and_pin_are_not_persisted_or_logged(tmp_path):
     runtime, _ = make_runtime(tmp_path)
     _, token, _ = provision(runtime, pin="6789")

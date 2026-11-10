@@ -114,9 +114,10 @@ class GuestStore:
             )
             if cursor.rowcount != 1:
                 raise KeyError(profile_id)
-            connection.execute(
-                "UPDATE sessions SET revoked=1 WHERE profile_id=?", (profile_id,)
-            )
+            if not active:
+                connection.execute(
+                    "UPDATE sessions SET revoked=1 WHERE profile_id=?", (profile_id,)
+                )
             connection.commit()
         return self.get_profile(profile_id)
 
@@ -167,9 +168,6 @@ class GuestStore:
             connection.execute(
                 "UPDATE profiles SET revision=revision+1, updated_at=? WHERE id=?",
                 (now, profile_id),
-            )
-            connection.execute(
-                "UPDATE sessions SET revoked=1 WHERE profile_id=?", (profile_id,)
             )
             connection.commit()
         return profile_id
@@ -276,7 +274,7 @@ class GuestStore:
     def list_shares(self, profile_id: str | None = None) -> list[dict]:
         query = (
             "SELECT s.id,s.profile_id,s.enabled,s.label,s.expires_at,s.max_sessions,s.profile_revision,s.created_at,"
-            "s.revoked_reason,s.revoked_by,s.revoked_at,(s.profile_revision=p.revision) AS revision_valid "
+            "s.revoked_reason,s.revoked_by,s.revoked_at,1 AS revision_valid "
             "FROM shares s JOIN profiles p ON p.id=s.profile_id"
         )
         args: tuple = ()
@@ -297,8 +295,8 @@ class GuestStore:
             if share is None or not share["enabled"] or share["expires_at"] <= now:
                 raise StoreError("share_unavailable")
             profile = connection.execute("SELECT * FROM profiles WHERE id=?", (share["profile_id"],)).fetchone()
-            if profile is None or not profile["active"] or profile["revision"] != share["profile_revision"]:
-                raise StoreError("share_revision_pending")
+            if profile is None or not profile["active"]:
+                raise StoreError("profile_unavailable")
             if not verify_pin(share["pin_hash"], pin):
                 raise StoreError("invalid_pin")
             active = connection.execute(
@@ -331,7 +329,7 @@ class GuestStore:
             raise StoreError("session_unavailable")
         if row["share_id"] != share_id or row["profile_id"] != profile_id \
                 or row["profile_revision"] != revision or profile is None \
-                or not profile["active"] or profile["revision"] != revision:
+                or not profile["active"]:
             raise StoreError("session_revision_mismatch")
         if csrf_token is not None and token_digest(self.token_key, csrf_token) != row["csrf_digest"]:
             raise StoreError("csrf_failed")
