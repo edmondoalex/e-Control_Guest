@@ -194,6 +194,7 @@ def test_guest_entry_uses_dedicated_non_share_path(runtime):
     assert 'src="static/ekonex-logo.png"' in page.text
     assert 'id="loading-splash"' in page.text
     assert 'id="login-form"' in page.text
+    assert "const splashMinimumMs=5000" in (Path(__file__).parents[1] / "app/static/guest.js").read_text()
     assert guest.get("/share").status_code == 404
 
 

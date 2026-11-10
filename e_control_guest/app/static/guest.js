@@ -2,7 +2,7 @@ let csrf=sessionStorage.getItem('ecg_csrf')||'',timer=null,loading=false;const $
 function toast(m,b=false){const e=$('#toast');e.textContent=m;e.style.borderColor=b?'#ff4964':'#26c6da';e.classList.add('show');setTimeout(()=>e.classList.remove('show'),3000)}
 async function api(path,opt={}){opt.headers={...(opt.headers||{})};if(opt.body){opt.headers['Content-Type']='application/json';if(csrf)opt.headers['X-eControl-CSRF']=csrf}const r=await fetch(path,opt);const d=await r.json().catch(()=>({}));if(!r.ok){const error=new Error(d.detail||`HTTP ${r.status}`);error.status=r.status;throw error}return d}
 function token(){return new URLSearchParams(location.hash.slice(1)).get('token')||''}
-const splashMinimumMs=900;
+const splashMinimumMs=5000;
 function showSplash(){const splash=$('#loading-splash');splash.classList.remove('hidden');splash.setAttribute('aria-busy','true')}
 function hideSplash(){const splash=$('#loading-splash');splash.classList.add('hidden');splash.removeAttribute('aria-busy')}
 async function login(){let splashStarted=0;try{const d=await api('api/guest/login',{method:'POST',body:JSON.stringify({token:token(),pin:$('#pin').value||null})});csrf=d.csrf;sessionStorage.setItem('ecg_csrf',csrf);history.replaceState(null,'',location.pathname);showDashboard();splashStarted=performance.now();showSplash();await load();const remaining=splashMinimumMs-(performance.now()-splashStarted);if(remaining>0)await new Promise(resolve=>setTimeout(resolve,remaining))}catch(e){$('#login-error').textContent=e.message}finally{if(splashStarted)hideSplash()}}
