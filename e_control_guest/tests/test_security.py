@@ -276,6 +276,7 @@ def test_guest_entry_uses_dedicated_non_share_path(runtime):
     assert 'id="loading-splash"' in page.text
     assert 'id="login-form"' in page.text
     assert 'rel="manifest" href="static/manifest.webmanifest"' in page.text
+    assert '<meta name="mobile-web-app-capable" content="yes">' in page.text
     assert 'id="install-app"' in page.text
     guest_js = (Path(__file__).parents[1] / "app/static/guest.js").read_text()
     assert "const splashMinimumMs=5000" in guest_js

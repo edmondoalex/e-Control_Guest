@@ -1,3 +1,11 @@
+## Handoff corrente - RC33 candidata locale, metadati PWA Chrome (10/11/2026)
+
+Aggiunto `mobile-web-app-capable=yes` accanto al metadato Apple per eliminare
+l'avviso di deprecazione Chrome. L'avviso relativo a `beforeinstallprompt` e
+atteso: il banner automatico viene intercettato e mostrato soltanto dopo il
+gesto esplicito sul pulsante `Installa app`, come richiesto dal browser.
+Versione locale `0.1.0-rc33`; pubblicazione e installazione non eseguite.
+
 ## Handoff corrente - RC32 pubblicata, gestione sessioni attive (10/11/2026)
 
 Pubblicata e qualificata RC32. L'elenco link mostra le sessioni attive rispetto al
