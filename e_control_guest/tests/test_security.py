@@ -188,7 +188,12 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
 
 def test_guest_entry_uses_dedicated_non_share_path(runtime):
     guest = TestClient(create_guest_app(runtime))
-    assert guest.get("/guest-access").status_code == 200
+    page = guest.get("/guest-access")
+    assert page.status_code == 200
+    assert 'class="ekonex-logo"' in page.text
+    assert 'src="static/ekonex-logo.png"' in page.text
+    assert 'id="loading-splash"' in page.text
+    assert 'id="login-form"' in page.text
     assert guest.get("/share").status_code == 404
 
 
