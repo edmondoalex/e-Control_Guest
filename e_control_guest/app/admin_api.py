@@ -16,6 +16,7 @@ from .runtime import Runtime
 from .web import install_http_guards
 
 STATIC = Path(__file__).with_name("static")
+PERMANENT_EXPIRES_AT = 253402300799.0
 
 
 class ProfileCreate(BaseModel):
@@ -43,7 +44,7 @@ class PermissionUpdate(BaseModel):
 
 class ShareCreate(BaseModel):
     pin: str | None = Field(default=None, min_length=4, max_length=12)
-    valid_minutes: int = Field(default=60, ge=5, le=43200)
+    valid_minutes: int | None = Field(default=60, ge=5, le=43200)
     max_sessions: int = Field(default=1, ge=1, le=20)
 
 
@@ -209,9 +210,13 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
 
     @app.post("/api/admin/profiles/{profile_id}/shares", dependencies=[Depends(require_csrf)])
     async def create_share(profile_id: str, payload: ShareCreate, request: Request):
+        if payload.valid_minutes is None and not payload.pin:
+            raise HTTPException(400, "Il PIN è obbligatorio per i link senza scadenza")
+        expires_at = (PERMANENT_EXPIRES_AT if payload.valid_minutes is None
+                      else time.time() + payload.valid_minutes * 60)
         try:
             share, token = runtime.store.create_share(
-                profile_id, pin=payload.pin, expires_at=time.time() + payload.valid_minutes * 60,
+                profile_id, pin=payload.pin, expires_at=expires_at,
                 max_sessions=payload.max_sessions)
         except (KeyError, ValueError) as exc:
             raise HTTPException(400, str(exc)) from exc

@@ -118,6 +118,14 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
                                       "limits": {}}}
     assert admin.put(f"/api/admin/cards/{card['id']}/permissions", headers=write,
                      json={"permissions": permissions}).status_code == 200
+    assert admin.post(f"/api/admin/profiles/{profile['id']}/shares", headers=write,
+                      json={"pin": None, "valid_minutes": None,
+                            "max_sessions": 1}).status_code == 400
+    permanent = admin.post(f"/api/admin/profiles/{profile['id']}/shares", headers=write,
+                           json={"pin": "1357", "valid_minutes": None,
+                                 "max_sessions": 1})
+    assert permanent.status_code == 200
+    assert permanent.json()["share"]["expires_at"] > 250_000_000_000
     shared = admin.post(f"/api/admin/profiles/{profile['id']}/shares", headers=write,
                         json={"pin": "2468", "valid_minutes": 60, "max_sessions": 1}).json()
     assert urlsplit(shared["fragment_url"]).path == "/guest-access"
