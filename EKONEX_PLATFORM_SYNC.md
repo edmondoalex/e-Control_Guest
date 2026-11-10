@@ -1,4 +1,18 @@
-## Handoff corrente - RC7 pubblicata, aggiornamento proprietario pendente (10/11/2026)
+## Handoff corrente - RC10 multi-arch pubblicata e qualificata (10/11/2026)
+
+RC10 estende il pacchetto a tutte le architetture add-on Home Assistant:
+`amd64`, `aarch64`, `armv7`, `armhf` e `i386`. La build usa le immagini base
+ufficiali per architettura e installa/rimuove un toolchain temporaneo quando le
+dipendenze crittografiche richiedono compilazione nativa. Home Assistant Green
+(`aarch64`) e quindi coperto.
+
+Commit RC10 `4d3e38d`, tag/release `v0.1.0-rc10`. Qualifica locale: 14 test e
+compileall PASS. GitHub Actions tag `42842108337`: metadati, test e build reali
+QEMU per tutte e cinque le architetture PASS. RC9 e marcata non qualificata e
+superseded per il precedente fallimento armv7; RC8 resta la prima candidata
+qualificata amd64/aarch64. Installazione sul Green resta al proprietario.
+
+## Handoff precedente - RC7 pubblicata, aggiornamento proprietario pendente (10/11/2026)
 
 Durante il collaudo HTTPS il tunnel Cloudflare e il DNS
 `guest-grupposomet.e-control.tech` sono risultati operativi, ma Google Safe
