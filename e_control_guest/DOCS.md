@@ -44,6 +44,8 @@ dominio o un servizio Home Assistant arbitrario.
 
 - `guest_port`: porta del portale Guest, predefinita `8100`;
 - `guest_base_url`: URL HTTPS usato per generare i link;
+- `allow_insecure_local_http`: consente cookie Guest senza flag `Secure` solo
+  per prove temporanee sulla LAN; deve restare `false` in produzione;
 - `session_minutes`: durata massima della sessione, da 5 a 240 minuti;
 - `audit_retention_days`: riserva per la politica di conservazione; la RC non
   elimina automaticamente eventi;

@@ -113,7 +113,7 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
             session_id=row["id"], share_id=row["share_id"], profile_id=row["profile_id"],
             revision=row["profile_revision"], lifetime_seconds=lifetime,
         )
-        secure = not runtime.settings.development_admin
+        secure = not runtime.settings.allow_insecure_local_http
         response.set_cookie("ecg_session", signed, max_age=lifetime, httponly=True,
                             secure=secure, samesite="strict", path="/")
         response.set_cookie("ecg_device", device_token, max_age=lifetime, httponly=True,

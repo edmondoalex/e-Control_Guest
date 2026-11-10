@@ -1,6 +1,6 @@
 {
   "name": "e-Control Guest",
-  "version": "0.1.0-rc5",
+  "version": "0.1.0-rc6",
   "slug": "e_control_guest",
   "description": "Condivisione controllata e verificabile di dashboard Guest",
   "url": "https://github.com/edmondoalex/e-Control_Guest",
@@ -22,6 +22,7 @@
   "options": {
     "guest_port": 8100,
     "guest_base_url": "",
+    "allow_insecure_local_http": false,
     "session_minutes": 30,
     "audit_retention_days": 365,
     "trusted_proxy_cidrs": []
@@ -29,6 +30,7 @@
   "schema": {
     "guest_port": "port",
     "guest_base_url": "str?",
+    "allow_insecure_local_http": "bool",
     "session_minutes": "int(5,240)",
     "audit_retention_days": "int(30,3650)",
     "trusted_proxy_cidrs": ["str"]

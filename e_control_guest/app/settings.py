@@ -14,6 +14,7 @@ class Settings:
     session_minutes: int = 30
     audit_retention_days: int = 365
     guest_base_url: str = ""
+    allow_insecure_local_http: bool = False
     trusted_proxy_cidrs: tuple[str, ...] = ()
     supervisor_url: str = "http://supervisor"
     supervisor_token: str = ""
@@ -41,6 +42,7 @@ class Settings:
             session_minutes=bounded("session_minutes", 30, 5, 240),
             audit_retention_days=bounded("audit_retention_days", 365, 30, 3650),
             guest_base_url=str(options.get("guest_base_url", "")).strip().rstrip("/"),
+            allow_insecure_local_http=options.get("allow_insecure_local_http") is True,
             trusted_proxy_cidrs=tuple(
                 str(item).strip() for item in options.get("trusted_proxy_cidrs", [])
                 if isinstance(item, str) and item.strip()

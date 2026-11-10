@@ -29,7 +29,8 @@ class FakeAdapter:
 
 def make_runtime(tmp_path):
     adapter = FakeAdapter()
-    settings = Settings(data_dir=tmp_path, development_admin=True, session_minutes=30)
+    settings = Settings(data_dir=tmp_path, development_admin=True, session_minutes=30,
+                        allow_insecure_local_http=True)
     return build_runtime(settings, adapter=adapter), adapter
 
 
