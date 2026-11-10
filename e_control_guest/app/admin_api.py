@@ -131,9 +131,12 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
     async def dashboard_cards(url_path: str):
         try:
             config = await runtime.dashboard_client.config(None if url_path == "lovelace" else url_path)
+            cards = [item.public() for item in inspect_dashboard(config, url_path)]
         except DashboardUnavailable as exc:
             raise HTTPException(503, str(exc)) from exc
-        return {"cards": [item.public() for item in inspect_dashboard(config, url_path)]}
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return {"cards": cards}
 
     @app.post("/api/admin/import/inspect", dependencies=[Depends(require_csrf)])
     async def inspect_manual(payload: InspectDashboard):

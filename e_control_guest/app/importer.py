@@ -80,7 +80,9 @@ def _walk_cards(cards: list, prefix: str) -> Iterator[tuple[str, dict]]:
 
 def inspect_dashboard(config: dict, dashboard: str = "lovelace") -> list[CardCandidate]:
     if not isinstance(config, dict) or not isinstance(config.get("views"), list):
-        raise ValueError("Configurazione dashboard non valida")
+        if isinstance(config, dict) and isinstance(config.get("strategy"), dict):
+            raise ValueError("Dashboard generata automaticamente: non contiene schede importabili")
+        raise ValueError("Configurazione dashboard non valida o priva di schede importabili")
     candidates: list[CardCandidate] = []
     for view_index, view in enumerate(config["views"]):
         if not isinstance(view, dict):

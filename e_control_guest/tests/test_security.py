@@ -58,6 +58,11 @@ def test_importer_flattens_only_safe_builtin_cards():
     assert cards[1].reason == "custom_card_not_executable"
 
 
+def test_generated_dashboard_returns_readable_error():
+    with pytest.raises(ValueError, match="generata automaticamente"):
+        inspect_dashboard({"strategy": {"type": "map"}}, "map")
+
+
 def test_policy_is_fail_closed_and_checks_limits():
     permissions = {"light.tasting": {"actions": ["set_brightness"],
                                       "limits": {"brightness": [10, 100]}}}
