@@ -14,6 +14,7 @@ class Settings:
     session_minutes: int = 30
     audit_retention_days: int = 365
     guest_base_url: str = ""
+    trusted_proxy_cidrs: tuple[str, ...] = ()
     supervisor_url: str = "http://supervisor"
     supervisor_token: str = ""
     development_admin: bool = False
@@ -40,6 +41,10 @@ class Settings:
             session_minutes=bounded("session_minutes", 30, 5, 240),
             audit_retention_days=bounded("audit_retention_days", 365, 30, 3650),
             guest_base_url=str(options.get("guest_base_url", "")).strip().rstrip("/"),
+            trusted_proxy_cidrs=tuple(
+                str(item).strip() for item in options.get("trusted_proxy_cidrs", [])
+                if isinstance(item, str) and item.strip()
+            ),
             supervisor_url=os.environ.get("SUPERVISOR_URL", "http://supervisor").rstrip("/"),
             supervisor_token=os.environ.get("SUPERVISOR_TOKEN", ""),
             development_admin=os.environ.get("ECONTROL_GUEST_DEV_ADMIN") == "1",

@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .crypto import b64url
-from .policy import PolicyDenied, authorize
+from .policy import PolicyDenied, authorize, public_state
 from .rate_limit import RateLimitExceeded
 from .runtime import Runtime
 from .storage import StoreError
@@ -140,7 +140,7 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
                 if not policy.get("read", False):
                     continue
                 try:
-                    state = await runtime.adapter.state(entity_id)
+                    state = public_state(await runtime.adapter.state(entity_id))
                     states.append({**state, "name": entity.get("name") or "",
                                    "icon": entity.get("icon") or "",
                                    "actions": policy.get("actions", []),
@@ -199,7 +199,7 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
             outcome="allowed", metadata={"action": payload.action, "value": payload.value},
         )
         try:
-            readback = await runtime.adapter.execute(command)
+            readback = public_state(await runtime.adapter.execute(command))
             result = {"ok": True, "request_id": payload.request_id, "readback": readback}
             runtime.audit.append(
                 actor_type="guest", actor_id=runtime.user_agent_id(request), session_id=current["sid"],

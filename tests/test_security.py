@@ -14,6 +14,7 @@ from app.audit import AuditLog
 from app.guest_api import create_guest_app
 from app.importer import inspect_dashboard
 from app.policy import PolicyDenied, authorize
+from app.policy import public_state
 from app.runtime import build_runtime
 from app.settings import Settings
 
@@ -68,6 +69,13 @@ def test_policy_is_fail_closed_and_checks_limits():
         authorize(permissions, "light.tasting", "turn_on")
     with pytest.raises(PolicyDenied):
         authorize(permissions, "switch.not_shared", "turn_on")
+
+
+def test_state_attributes_are_allowlisted():
+    value = public_state({"entity_id": "light.tasting", "state": "on",
+                          "attributes": {"friendly_name": "Tasting", "brightness": 120,
+                                         "access_token": "must-not-leak", "private": {"x": 1}}})
+    assert value["attributes"] == {"friendly_name": "Tasting", "brightness": 120}
 
 
 def test_audit_redacts_secrets_and_detects_tampering(tmp_path: Path):

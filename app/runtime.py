@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
 import secrets
 from dataclasses import dataclass
 
@@ -30,6 +31,18 @@ class Runtime:
 
     def network_id(self, request: Request) -> str:
         address = request.client.host if request.client else "unknown"
+        try:
+            peer = ipaddress.ip_address(address)
+            trusted = any(peer in ipaddress.ip_network(cidr, strict=False)
+                          for cidr in self.settings.trusted_proxy_cidrs)
+        except ValueError:
+            trusted = False
+        if trusted:
+            forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
+            try:
+                address = str(ipaddress.ip_address(forwarded))
+            except ValueError:
+                pass
         return hmac.new(self.identity_key, address.encode("utf-8"), hashlib.sha256).hexdigest()[:24]
 
     def user_agent_id(self, request: Request) -> str:

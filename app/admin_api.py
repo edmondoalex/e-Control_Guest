@@ -55,7 +55,8 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
     async def require_ingress(request: Request) -> None:
         if request.url.path == "/health" or runtime.settings.development_admin:
             return
-        if not (request.headers.get("x-ingress-path") or request.headers.get("x-hass-user-id")):
+        if not (request.headers.get("x-ingress-path") or request.headers.get("x-hass-user-id")
+                or request.headers.get("x-remote-user-id")):
             runtime.audit.append(actor_type="admin", action="admin_access", outcome="denied",
                                  metadata={"network_id": runtime.network_id(request)})
             raise HTTPException(403, "Amministrazione disponibile soltanto tramite Ingress")

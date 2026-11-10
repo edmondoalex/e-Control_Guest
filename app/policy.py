@@ -45,6 +45,29 @@ def suggested_actions(entity_id: str) -> list[str]:
     return list(ACTION_CATALOG.get(domain, {}))
 
 
+SAFE_ATTRIBUTES = {
+    "light": {"friendly_name", "icon", "brightness", "color_temp_kelvin", "supported_color_modes"},
+    "switch": {"friendly_name", "icon", "device_class"},
+    "climate": {"friendly_name", "icon", "temperature", "current_temperature", "hvac_action",
+                "hvac_modes", "min_temp", "max_temp", "target_temp_step", "unit_of_measurement"},
+    "cover": {"friendly_name", "icon", "device_class", "current_position"},
+    "button": {"friendly_name", "icon", "device_class"},
+}
+
+
+def public_state(value: dict) -> dict:
+    entity_id = str(value.get("entity_id") or "")
+    domain = entity_id.partition(".")[0]
+    attributes = value.get("attributes") if isinstance(value.get("attributes"), dict) else {}
+    allowed = SAFE_ATTRIBUTES.get(domain, {"friendly_name", "icon", "unit_of_measurement", "device_class"})
+    return {
+        "entity_id": entity_id,
+        "state": str(value.get("state") or "unknown")[:100],
+        "attributes": {key: attributes[key] for key in allowed if key in attributes
+                       and isinstance(attributes[key], (str, int, float, bool, list, type(None)))},
+    }
+
+
 def authorize(permissions: dict, entity_id: str, action: str, value: Any = None) -> Command:
     if not isinstance(permissions, dict) or entity_id not in permissions:
         raise PolicyDenied("entity_not_shared")
