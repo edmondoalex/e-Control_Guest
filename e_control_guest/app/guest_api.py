@@ -114,8 +114,26 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
                 lifetime_seconds=runtime.settings.session_minutes * 60,
             )
         except StoreError as exc:
-            audit_denied(request, "login", str(exc))
-            raise HTTPException(401, "Link, PIN o disponibilita non validi") from exc
+            reason = str(exc)
+            audit_denied(request, "login", reason)
+            status, detail = {
+                "invalid_pin": (401, "PIN errato. Controlla il codice ricevuto e riprova."),
+                "session_limit": (
+                    409,
+                    "Limite di sessioni simultanee raggiunto. Chiudi una sessione Guest "
+                    "attiva oppure chiedi all'amministratore di aumentare il limite.",
+                ),
+                "share_unavailable": (
+                    410,
+                    "Link Guest scaduto, revocato o non valido. Richiedi un nuovo link "
+                    "all'amministratore.",
+                ),
+                "profile_unavailable": (
+                    403,
+                    "Profilo Guest disattivato o non disponibile. Contatta l'amministratore.",
+                ),
+            }.get(reason, (401, "Accesso Guest negato dal server."))
+            raise HTTPException(status, detail) from exc
         lifetime = max(1, int(row["expires_at"]) - int(__import__("time").time()))
         signed = runtime.signer.issue(
             session_id=row["id"], share_id=row["share_id"], profile_id=row["profile_id"],

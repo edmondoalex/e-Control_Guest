@@ -145,7 +145,9 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
     assert raw_token.encode() not in database_text
     assert b"2468" not in database_text
 
-    assert guest.post("/api/guest/login", json={"token": raw_token, "pin": "0000"}).status_code == 401
+    wrong_pin = guest.post("/api/guest/login", json={"token": raw_token, "pin": "0000"})
+    assert wrong_pin.status_code == 401
+    assert wrong_pin.json()["detail"].startswith("PIN errato")
     login = guest.post("/api/guest/login", json={"token": raw_token, "pin": "2468"})
     assert login.status_code == 200
     csrf = login.json()["csrf"]

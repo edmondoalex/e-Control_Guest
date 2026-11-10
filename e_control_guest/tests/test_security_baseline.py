@@ -230,9 +230,11 @@ def test_same_browser_replaces_its_session_without_consuming_another_slot(tmp_pa
             "/api/guest/login", json={"token": token, "pin": "1234"}
         ).status_code == 200
         with TestClient(app, base_url="http://guest.test") as other_browser:
-            assert other_browser.post(
+            denied = other_browser.post(
                 "/api/guest/login", json={"token": token, "pin": "1234"}
-            ).status_code == 401
+            )
+            assert denied.status_code == 409
+            assert denied.json()["detail"].startswith("Limite di sessioni simultanee")
 
 
 def test_audit_chain_detects_tampering(tmp_path):
