@@ -1,4 +1,4 @@
-## Handoff corrente - RC4 pubblicata e qualificata (10/11/2026)
+## Handoff corrente - RC4 installata e avviata (10/11/2026)
 
 CHANGE-2026-058 implementata nel repository owner fino al gate locale. Realizzati
 pacchetto Hassio legacy, processi ASGI separati per amministrazione Ingress e
@@ -37,3 +37,8 @@ esplicita. Nessun accesso o comando su impianti reali.
 
 Prossimo passo: gate del proprietario per inserimento nel catalogo e, con gate
 separato, installazione pilota.
+
+Aggiornamento del proprietario: RC4 installata e avviata. Installazione e avvio
+non sono ancora accettazione funzionale. Prossimo passo: collaudo read-only di
+Ingress, persistenza, creazione profilo/link, accesso Guest HTTPS, revoca e
+integrita audit. Comandi reali esclusi fino a indicazione esplicita.
