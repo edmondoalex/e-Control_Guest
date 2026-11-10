@@ -1,3 +1,18 @@
+## Handoff corrente - RC31 PWA, gestione link, JSON e audit limitato (10/11/2026)
+
+Pubblicata e qualificata RC31. La sezione contenuti e permessi parte chiusa;
+le condivisioni attive consentono di modificare durata e sessioni senza cambiare
+token o PIN. Aggiunti installazione PWA senza cache di dati Guest/API, filtro e
+limiti configurabili del registro audit, potatura con ancora HMAC verificabile,
+oltre a esportazione e importazione JSON atomica di contenuti e permessi. Token,
+PIN, sessioni e audit non sono inclusi nell'esportazione.
+
+Commit `488f7f9`, tag `v0.1.0-rc31`; 24 test, compileall, sintassi JavaScript,
+validazione JSON e diff-check locali PASS. GitHub Actions `42891127033` (main)
+e `42891133198` (tag): test, metadati e build `amd64`, `aarch64`, `armv7`,
+`armhf`, `i386` PASS. Installazione e collaudo sull'Home Assistant Green non
+eseguiti e restano al proprietario.
+
 ## Handoff corrente - RC30 motivazioni login esplicite (10/11/2026)
 
 Pubblicata e qualificata RC30. Il portale distingue PIN errato, limite di
