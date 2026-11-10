@@ -1,6 +1,8 @@
 # e-Control Guest — guida
 
-Architetture supportate: `amd64` e `aarch64`, inclusi Home Assistant Green.
+Architetture supportate: `amd64`, `aarch64`, `armv7`, `armhf` e `i386`,
+inclusi Home Assistant Green e i sistemi Home Assistant legacy supportati dal
+Supervisor.
 
 ## Prima configurazione
 

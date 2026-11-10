@@ -32,7 +32,7 @@ jobs:
           import json
           config = json.load(open('e_control_guest/config.json'))
           build = json.load(open('e_control_guest/build.json'))
-          assert set(config['arch']) == {'amd64', 'aarch64'}
+          assert set(config['arch']) == {'amd64', 'aarch64', 'armv7', 'armhf', 'i386'}
           assert set(config['arch']) <= set(build['build_from'])
           PY
           test -f repository.yaml
@@ -46,3 +46,15 @@ jobs:
         run: |
           base=$(python -c "import json; print(json.load(open('e_control_guest/build.json'))['build_from']['aarch64'])")
           docker build --platform linux/arm64 --build-arg BUILD_FROM="$base" --tag e-control-guest:aarch64-candidate e_control_guest
+      - name: Build armv7 add-on image
+        run: |
+          base=$(python -c "import json; print(json.load(open('e_control_guest/build.json'))['build_from']['armv7'])")
+          docker build --platform linux/arm/v7 --build-arg BUILD_FROM="$base" --tag e-control-guest:armv7-candidate e_control_guest
+      - name: Build armhf add-on image
+        run: |
+          base=$(python -c "import json; print(json.load(open('e_control_guest/build.json'))['build_from']['armhf'])")
+          docker build --platform linux/arm/v6 --build-arg BUILD_FROM="$base" --tag e-control-guest:armhf-candidate e_control_guest
+      - name: Build i386 add-on image
+        run: |
+          base=$(python -c "import json; print(json.load(open('e_control_guest/build.json'))['build_from']['i386'])")
+          docker build --platform linux/386 --build-arg BUILD_FROM="$base" --tag e-control-guest:i386-candidate e_control_guest
