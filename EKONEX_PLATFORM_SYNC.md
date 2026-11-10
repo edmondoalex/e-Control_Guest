@@ -1,3 +1,29 @@
+## Handoff corrente - RC30 motivazioni login esplicite (10/11/2026)
+
+Pubblicata e qualificata RC30. Il portale distingue PIN errato, limite di
+sessioni simultanee, link scaduto/revocato/non valido, profilo disattivato e
+diniego inatteso, mostrando una spiegazione operativa direttamente sotto il
+form. Include il logo trasparente e il riutilizzo dello slot dello stesso
+browser introdotti nella RC29.
+
+Commit `f41185e`, tag/release `v0.1.0-rc30`; 21 test, compileall, sintassi
+JavaScript e diff-check locali PASS. GitHub Actions tag `42879476901`: test,
+metadati e build `amd64`, `aarch64`, `armv7`, `armhf`, `i386` PASS.
+Installazione e verifica browser reale restano al proprietario.
+
+## Handoff corrente - RC29 logo trasparente e rientro browser (10/11/2026)
+
+Pubblicata e qualificata RC29. L'asset Ekonex di intestazione e splash usa un
+PNG con vero canale alfa e nessun rettangolo nero incorporato. Corretto inoltre
+il falso `session_limit`: il login riutilizza il cookie dispositivo esistente
+e sostituisce la precedente sessione dello stesso browser; dispositivi diversi
+continuano a rispettare il limite di simultaneita configurato.
+
+Commit `402f739`, tag/release `v0.1.0-rc29`; 21 test, compileall, sintassi
+JavaScript e diff-check locali PASS. GitHub Actions tag `42878359956`: test,
+metadati e build `amd64`, `aarch64`, `armv7`, `armhf`, `i386` PASS.
+Installazione e verifica browser reale restano al proprietario.
+
 ## Handoff corrente - RC27 recupero link legacy (10/11/2026)
 
 Pubblicata e qualificata RC27. Corretto HTTP 500 dei pulsanti `Mostra link` e
