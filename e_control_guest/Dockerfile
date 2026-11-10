@@ -6,7 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     ECONTROL_GUEST_DATA_DIR=/data
 
 COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install --no-cache-dir -r /tmp/requirements.txt
+RUN apk add --no-cache --virtual .python-build-deps build-base \
+    && pip3 install --no-cache-dir -r /tmp/requirements.txt \
+    && apk del .python-build-deps
 
 COPY app /opt/e-control-guest/app
 COPY rootfs /
