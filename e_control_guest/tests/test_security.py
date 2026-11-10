@@ -118,6 +118,14 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
                                       "limits": {}}}
     assert admin.put(f"/api/admin/cards/{card['id']}/permissions", headers=write,
                      json={"permissions": permissions}).status_code == 200
+    revision = admin.get(
+        f"/api/admin/profiles/{profile['id']}", headers=headers
+    ).json()["dashboard"]["profile"]["revision"]
+    saved_all = admin.put(f"/api/admin/profiles/{profile['id']}/permissions", headers=write,
+                          json={"cards": {card["id"]: permissions}})
+    assert saved_all.status_code == 200
+    assert saved_all.json()["profile"]["revision"] == revision + 1
+    assert saved_all.json()["cards"][0]["permissions"] == permissions
     assert admin.post(f"/api/admin/profiles/{profile['id']}/shares", headers=write,
                       json={"label": "Senza PIN", "pin": None, "valid_minutes": None,
                             "max_sessions": 1}).status_code == 400
@@ -142,6 +150,10 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
     view = guest.get("/api/guest/dashboard")
     assert view.status_code == 200
     assert view.json()["cards"][0]["states"][0]["state"] == "off"
+    audit_events = admin.get("/api/admin/audit", headers=headers).json()["events"]
+    guest_reads = [event for event in audit_events if event["action"] == "state_read"]
+    assert guest_reads[0]["metadata"]["label"] == "Ospite temporaneo"
+    assert guest_reads[0]["metadata"]["entity_name"] == "Tasting Room"
 
     request_id = "b3b55223-6632-4135-9314-a1765fc0a25d"
     action = {"request_id": request_id, "card_id": card["id"],

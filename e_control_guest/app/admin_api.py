@@ -42,6 +42,10 @@ class PermissionUpdate(BaseModel):
     permissions: dict[str, dict]
 
 
+class ProfilePermissionUpdate(BaseModel):
+    cards: dict[str, dict[str, dict]]
+
+
 class ShareCreate(BaseModel):
     label: str = Field(min_length=1, max_length=100)
     pin: str | None = Field(default=None, min_length=4, max_length=12)
@@ -57,6 +61,21 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
     app = FastAPI(title="e-Control Guest Admin", docs_url=None, redoc_url=None)
     install_http_guards(app, runtime, surface="admin")
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+    def validate_permissions(card: dict, permissions: dict[str, dict]) -> None:
+        entities = {x["entity_id"] for x in card["config"]["entities"]}
+        if set(permissions) != entities:
+            raise HTTPException(400, "I permessi devono coprire esattamente le entita importate")
+        probes = {"set_temperature": 20, "set_brightness": 1, "set_position": 1,
+                  "set_hvac_mode": "off"}
+        for entity_id, policy in permissions.items():
+            if not isinstance(policy, dict) or not isinstance(policy.get("actions"), list):
+                raise HTTPException(400, "Permessi non validi")
+            for action in policy["actions"]:
+                try:
+                    authorize({entity_id: policy}, entity_id, action, probes.get(action))
+                except PolicyDenied as exc:
+                    raise HTTPException(400, str(exc)) from exc
 
     async def require_ingress(request: Request) -> None:
         if runtime.settings.development_admin:
@@ -194,23 +213,34 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
             card = runtime.store.get_card(card_id)
         except KeyError as exc:
             raise HTTPException(404, "Scheda non trovata") from exc
-        entities = {x["entity_id"] for x in card["config"]["entities"]}
-        if set(payload.permissions) != entities:
-            raise HTTPException(400, "I permessi devono coprire esattamente le entita importate")
-        probes = {"set_temperature": 20, "set_brightness": 1, "set_position": 1,
-                  "set_hvac_mode": "off"}
-        for entity_id, policy in payload.permissions.items():
-            if not isinstance(policy, dict) or not isinstance(policy.get("actions"), list):
-                raise HTTPException(400, "Permessi non validi")
-            for action in policy["actions"]:
-                try:
-                    authorize({entity_id: policy}, entity_id, action, probes.get(action))
-                except PolicyDenied as exc:
-                    raise HTTPException(400, str(exc)) from exc
+        validate_permissions(card, payload.permissions)
         updated = runtime.store.update_card_permissions(card_id, payload.permissions)
         runtime.audit.append(actor_type="admin", actor_id=request.headers.get("x-hass-user-id", "ingress"),
                              action="permissions_update", resource=card_id, outcome="allowed",
                              metadata={"entities": sorted(payload.permissions)})
+        return updated
+
+    @app.put("/api/admin/profiles/{profile_id}/permissions", dependencies=[Depends(require_csrf)])
+    async def profile_permissions(profile_id: str, payload: ProfilePermissionUpdate, request: Request):
+        try:
+            dashboard = runtime.store.dashboard(profile_id)
+        except KeyError as exc:
+            raise HTTPException(404, "Profilo non trovato") from exc
+        cards = {card["id"]: card for card in dashboard["cards"]}
+        if set(payload.cards) != set(cards):
+            raise HTTPException(400, "I permessi devono coprire esattamente tutte le schede del profilo")
+        for card_id, permissions in payload.cards.items():
+            validate_permissions(cards[card_id], permissions)
+        try:
+            updated = runtime.store.update_profile_permissions(profile_id, payload.cards)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        runtime.audit.append(
+            actor_type="admin", actor_id=request.headers.get("x-hass-user-id", "ingress"),
+            action="permissions_update_all", resource=profile_id, outcome="allowed",
+            metadata={"card_count": len(payload.cards),
+                      "entity_count": sum(len(value) for value in payload.cards.values())},
+        )
         return updated
 
     @app.post("/api/admin/profiles/{profile_id}/shares", dependencies=[Depends(require_csrf)])
@@ -250,6 +280,13 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
     @app.get("/api/admin/audit", dependencies=[Depends(require_ingress)])
     async def audit(limit: int = 200):
         valid, broken_at = runtime.audit.verify()
-        return {"valid": valid, "broken_at": broken_at, "events": runtime.audit.recent(limit)}
+        events = runtime.audit.recent(limit)
+        for event in events:
+            if event["actor_type"] != "guest" or event["metadata"].get("label"):
+                continue
+            label = runtime.store.share_label_for_session(event.get("session_id", ""))
+            if label:
+                event["metadata"]["label"] = label
+        return {"valid": valid, "broken_at": broken_at, "events": events}
 
     return app

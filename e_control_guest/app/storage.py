@@ -194,6 +194,34 @@ class GuestStore:
             connection.commit()
         return self.get_card(card_id)
 
+    def update_profile_permissions(self, profile_id: str, cards: dict[str, dict]) -> dict:
+        if not isinstance(cards, dict):
+            raise ValueError("Permessi non validi")
+        now = _now()
+        with self._lock, self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            rows = connection.execute(
+                "SELECT id FROM cards WHERE profile_id=? ORDER BY created_at", (profile_id,)
+            ).fetchall()
+            if connection.execute("SELECT 1 FROM profiles WHERE id=?", (profile_id,)).fetchone() is None:
+                raise KeyError(profile_id)
+            card_ids = {str(row["id"]) for row in rows}
+            if set(cards) != card_ids:
+                raise ValueError("I permessi devono coprire esattamente tutte le schede del profilo")
+            for card_id, permissions in cards.items():
+                if not isinstance(permissions, dict):
+                    raise ValueError("Permessi non validi")
+                connection.execute(
+                    "UPDATE cards SET permissions_json=?, updated_at=? WHERE id=?",
+                    (json.dumps(permissions, separators=(",", ":")), now, card_id),
+                )
+            connection.execute(
+                "UPDATE profiles SET revision=revision+1, updated_at=? WHERE id=?",
+                (now, profile_id),
+            )
+            connection.commit()
+        return self.dashboard(profile_id)
+
     def dashboard(self, profile_id: str) -> dict:
         profile = self.get_profile(profile_id)
         with self._connect() as connection:
@@ -312,6 +340,16 @@ class GuestStore:
         with self._connect() as connection:
             connection.execute("UPDATE sessions SET last_seen_at=? WHERE id=?", (now, session_id))
         return dict(row)
+
+    def share_label_for_session(self, session_id: str) -> str:
+        if not session_id:
+            return ""
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT s.label FROM sessions x JOIN shares s ON s.id=x.share_id WHERE x.id=?",
+                (session_id,),
+            ).fetchone()
+        return str(row["label"]) if row is not None else ""
 
     def claim_operation(self, request_id: str, session_id: str) -> bool:
         try:

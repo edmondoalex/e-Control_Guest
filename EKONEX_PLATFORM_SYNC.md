@@ -1,3 +1,20 @@
+## Handoff corrente - RC17 locale, permessi cumulativi e identita Guest (10/11/2026)
+
+Preparata localmente RC17. La pagina amministrativa offre `Salva tutti i
+permessi`, con validazione e aggiornamento atomico dell'intero profilo e una
+sola revisione; il salvataggio della singola scheda resta disponibile. Il
+pulsante `Rimuovi` e ora visibile anche sulla scheda chiusa e richiede conferma.
+
+Il registro risolve il nome Guest dal nome/descrizione assegnato al link anche
+per letture stato e visualizzazione dashboard. L'endpoint audit arricchisce in
+lettura gli eventi precedenti collegando sessione e link, senza alterare la
+catena HMAC. Link storici privi di etichetta non possono acquisire
+retroattivamente un'identita. Nessun token o PIN e registrato.
+
+Qualifica locale: 15 test, compileall, sintassi JavaScript e diff-check PASS.
+Versione pacchetto predisposta `0.1.0-rc17`. Commit/push/tag/release non ancora
+eseguiti; installazione e collaudo Green restano al proprietario.
+
 ## Handoff corrente - RC16 link nominativi e audit leggibile (10/11/2026)
 
 RC13 sostituisce il cursore del setpoint con una casella numerica; RC14 aggiunge

@@ -133,6 +133,7 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
         except KeyError as exc:
             raise HTTPException(404, "Profilo non disponibile") from exc
         output = []
+        share_label = runtime.store.get_share(current["sh"]).get("label", "")
         for card in value["cards"]:
             if card["config"]["type"] == "heading":
                 output.append({"id": card["id"], "title": card["title"], "type": "heading",
@@ -159,7 +160,8 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
                 runtime.audit.append(
                     actor_type="guest", actor_id=runtime.user_agent_id(request),
                     session_id=current["sid"], action="state_read", resource=entity_id,
-                    outcome=outcome,
+                    outcome=outcome, metadata={"label": share_label,
+                                               "entity_name": entity.get("name") or entity_id},
                 )
             output.append({"id": card["id"], "title": card["title"],
                            "type": card["config"]["type"],
@@ -167,7 +169,7 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
         runtime.audit.append(
             actor_type="guest", actor_id=runtime.user_agent_id(request),
             session_id=current["sid"], action="dashboard_view", resource=current["pr"],
-            outcome="allowed", metadata={"cards": len(output)},
+            outcome="allowed", metadata={"cards": len(output), "label": share_label},
         )
         return {"profile": {"name": value["profile"]["name"]}, "cards": output}
 
