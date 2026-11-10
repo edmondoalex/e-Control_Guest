@@ -44,7 +44,7 @@ def make_runtime(tmp_path):
     return build_runtime(settings, adapter=adapter), adapter
 
 
-def provision(runtime, *, pin="1234"):
+def provision(runtime, *, pin="1234", max_sessions=2):
     profile = runtime.store.create_profile("Ospiti")
     config = {"views": [{"title": "Casa", "cards": [{"type": "entity", "entity": "light.sala"}]}]}
     card = runtime.store.add_card(profile["id"], snapshot(inspect_dashboard(config)[0]))
@@ -54,7 +54,8 @@ def provision(runtime, *, pin="1234"):
     })
     profile = runtime.store.get_profile(profile["id"])
     share, token = runtime.store.create_share(profile["id"], label="Ospite test", pin=pin,
-                                               expires_at=time.time() + 3600, max_sessions=2)
+                                               expires_at=time.time() + 3600,
+                                               max_sessions=max_sessions)
     return share, token, card
 
 
@@ -215,6 +216,23 @@ def test_legacy_share_gets_recoverable_alias_without_invalidating_original(tmp_p
         client.post("/api/guest/logout", headers={"X-eControl-CSRF": client.cookies.get("ecg_csrf", "")})
     with TestClient(create_guest_app(runtime), base_url="http://guest.test") as client:
         login(client, recovered_token)
+
+
+def test_same_browser_replaces_its_session_without_consuming_another_slot(tmp_path):
+    runtime, _ = make_runtime(tmp_path)
+    _, token, _ = provision(runtime, max_sessions=1)
+    app = create_guest_app(runtime)
+    with TestClient(app, base_url="http://guest.test") as same_browser:
+        assert same_browser.post(
+            "/api/guest/login", json={"token": token, "pin": "1234"}
+        ).status_code == 200
+        assert same_browser.post(
+            "/api/guest/login", json={"token": token, "pin": "1234"}
+        ).status_code == 200
+        with TestClient(app, base_url="http://guest.test") as other_browser:
+            assert other_browser.post(
+                "/api/guest/login", json={"token": token, "pin": "1234"}
+            ).status_code == 401
 
 
 def test_audit_chain_detects_tampering(tmp_path):

@@ -331,6 +331,12 @@ class GuestStore:
                 raise StoreError("profile_unavailable")
             if not verify_pin(share["pin_hash"], pin):
                 raise StoreError("invalid_pin")
+            device_digest = token_digest(self.token_key, device_token)
+            connection.execute(
+                "UPDATE sessions SET revoked=1 "
+                "WHERE share_id=? AND device_digest=? AND revoked=0",
+                (share["id"], device_digest),
+            )
             active = connection.execute(
                 "SELECT COUNT(*) FROM sessions WHERE share_id=? AND revoked=0 AND expires_at>?",
                 (share["id"], now),
@@ -342,7 +348,7 @@ class GuestStore:
             connection.execute(
                 "INSERT INTO sessions VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (session_id, share["id"], profile["id"], profile["revision"],
-                 token_digest(self.token_key, csrf_token), token_digest(self.token_key, device_token),
+                 token_digest(self.token_key, csrf_token), device_digest,
                  expires_at, 0, now, now),
             )
             connection.commit()

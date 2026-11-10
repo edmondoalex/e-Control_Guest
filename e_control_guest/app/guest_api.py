@@ -94,7 +94,12 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
         return FileResponse(STATIC / "icon.png", media_type="image/png")
 
     @app.post("/api/guest/login")
-    async def login(payload: Login, request: Request, response: Response):
+    async def login(
+        payload: Login,
+        request: Request,
+        response: Response,
+        ecg_device: str | None = Cookie(default=None),
+    ):
         network_id = runtime.network_id(request)
         try:
             runtime.limiter.check("login", network_id, limit=8, seconds=300)
@@ -102,7 +107,7 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
             audit_denied(request, "login", "rate_limited")
             raise HTTPException(429, "Troppi tentativi. Riprova piu tardi") from exc
         csrf_token = b64url(secrets.token_bytes(32))
-        device_token = b64url(secrets.token_bytes(32))
+        device_token = ecg_device or b64url(secrets.token_bytes(32))
         try:
             row = runtime.store.authenticate_share(
                 payload.token, payload.pin, csrf_token=csrf_token, device_token=device_token,
