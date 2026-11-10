@@ -43,9 +43,14 @@ class PermissionUpdate(BaseModel):
 
 
 class ShareCreate(BaseModel):
+    label: str = Field(min_length=1, max_length=100)
     pin: str | None = Field(default=None, min_length=4, max_length=12)
     valid_minutes: int | None = Field(default=60, ge=5, le=43200)
     max_sessions: int = Field(default=1, ge=1, le=20)
+
+
+class ShareRevoke(BaseModel):
+    reason: str = Field(min_length=3, max_length=200)
 
 
 def create_admin_app(runtime: Runtime) -> FastAPI:
@@ -216,23 +221,30 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
                       else time.time() + payload.valid_minutes * 60)
         try:
             share, token = runtime.store.create_share(
-                profile_id, pin=payload.pin, expires_at=expires_at,
+                profile_id, label=payload.label, pin=payload.pin, expires_at=expires_at,
                 max_sessions=payload.max_sessions)
         except (KeyError, ValueError) as exc:
             raise HTTPException(400, str(exc)) from exc
         runtime.audit.append(actor_type="admin", actor_id=request.headers.get("x-hass-user-id", "ingress"),
                              action="share_create", resource=share["id"], outcome="allowed",
-                             metadata={"profile_id": profile_id, "expires_at": share["expires_at"],
+                             metadata={"profile_id": profile_id, "label": payload.label,
+                                       "expires_at": share["expires_at"],
                                        "max_sessions": share["max_sessions"],
                                        "pin_required": bool(payload.pin)})
         return {"share": share,
                 "fragment_url": f"{runtime.settings.guest_base_url}/guest-access#token={token}"}
 
     @app.delete("/api/admin/shares/{share_id}", dependencies=[Depends(require_csrf)])
-    async def revoke_share(share_id: str, request: Request):
-        runtime.store.revoke_share(share_id)
-        runtime.audit.append(actor_type="admin", actor_id=request.headers.get("x-hass-user-id", "ingress"),
-                             action="share_revoke", resource=share_id, outcome="allowed")
+    async def revoke_share(share_id: str, payload: ShareRevoke, request: Request):
+        actor_id = request.headers.get("x-hass-user-id", "ingress")
+        try:
+            share = runtime.store.get_share(share_id)
+            runtime.store.revoke_share(share_id, reason=payload.reason, actor_id=actor_id)
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(400, str(exc)) from exc
+        runtime.audit.append(actor_type="admin", actor_id=actor_id,
+                             action="share_revoke", resource=share_id, outcome="allowed",
+                             metadata={"label": share.get("label", ""), "reason": payload.reason})
         return {"revoked": True}
 
     @app.get("/api/admin/audit", dependencies=[Depends(require_ingress)])

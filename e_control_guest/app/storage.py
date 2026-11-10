@@ -39,9 +39,10 @@ class GuestStore:
                 );
                 CREATE TABLE IF NOT EXISTS shares (
                     id TEXT PRIMARY KEY, profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-                    token_digest TEXT NOT NULL UNIQUE, pin_hash TEXT, enabled INTEGER NOT NULL,
+                    token_digest TEXT NOT NULL UNIQUE, pin_hash TEXT, enabled INTEGER NOT NULL, label TEXT NOT NULL DEFAULT '',
                     expires_at REAL NOT NULL, max_sessions INTEGER NOT NULL,
-                    profile_revision INTEGER NOT NULL, created_at REAL NOT NULL
+                    profile_revision INTEGER NOT NULL, created_at REAL NOT NULL,
+                    revoked_reason TEXT NOT NULL DEFAULT '', revoked_by TEXT NOT NULL DEFAULT '', revoked_at REAL
                 );
                 CREATE TABLE IF NOT EXISTS sessions (
                     id TEXT PRIMARY KEY, share_id TEXT NOT NULL REFERENCES shares(id) ON DELETE CASCADE,
@@ -57,6 +58,15 @@ class GuestStore:
                 CREATE INDEX IF NOT EXISTS ix_cards_profile ON cards(profile_id);
                 CREATE INDEX IF NOT EXISTS ix_sessions_share ON sessions(share_id, expires_at);
             """)
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(shares)")}
+            if "label" not in columns:
+                connection.execute("ALTER TABLE shares ADD COLUMN label TEXT NOT NULL DEFAULT ''")
+            if "revoked_reason" not in columns:
+                connection.execute("ALTER TABLE shares ADD COLUMN revoked_reason TEXT NOT NULL DEFAULT ''")
+            if "revoked_by" not in columns:
+                connection.execute("ALTER TABLE shares ADD COLUMN revoked_by TEXT NOT NULL DEFAULT ''")
+            if "revoked_at" not in columns:
+                connection.execute("ALTER TABLE shares ADD COLUMN revoked_at REAL")
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=10)
@@ -201,20 +211,23 @@ class GuestStore:
             })
         return {"profile": profile, "cards": cards}
 
-    def create_share(self, profile_id: str, *, pin: str | None, expires_at: float,
+    def create_share(self, profile_id: str, *, label: str = "", pin: str | None, expires_at: float,
                      max_sessions: int = 1) -> tuple[dict, str]:
         profile = self.get_profile(profile_id)
         if not profile["active"] or expires_at <= _now():
             raise ValueError("Scadenza condivisione non valida")
         if not 1 <= int(max_sessions) <= 20:
             raise ValueError("Numero sessioni non valido")
+        label = label.strip()
+        if not 1 <= len(label) <= 100:
+            raise ValueError("Nome ospite o descrizione non validi")
         raw_token = new_share_token()
         share_id, now = str(uuid.uuid4()), _now()
         with self._connect() as connection:
             connection.execute(
-                "INSERT INTO shares VALUES (?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO shares (id,profile_id,token_digest,pin_hash,enabled,label,expires_at,max_sessions,profile_revision,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (share_id, profile_id, token_digest(self.token_key, raw_token), hash_pin(pin),
-                 1, float(expires_at), int(max_sessions), int(profile["revision"]), now),
+                 1, label, float(expires_at), int(max_sessions), int(profile["revision"]), now),
             )
         return self.get_share(share_id), raw_token
 
@@ -225,7 +238,7 @@ class GuestStore:
     def get_share(self, share_id: str) -> dict:
         with self._connect() as connection:
             row = connection.execute(
-                "SELECT id,profile_id,enabled,expires_at,max_sessions,profile_revision,created_at "
+                "SELECT id,profile_id,enabled,label,expires_at,max_sessions,profile_revision,created_at,revoked_reason,revoked_by,revoked_at "
                 "FROM shares WHERE id=?", (share_id,),
             ).fetchone()
         if row is None:
@@ -234,14 +247,15 @@ class GuestStore:
 
     def list_shares(self, profile_id: str | None = None) -> list[dict]:
         query = (
-            "SELECT id,profile_id,enabled,expires_at,max_sessions,profile_revision,created_at "
-            "FROM shares"
+            "SELECT s.id,s.profile_id,s.enabled,s.label,s.expires_at,s.max_sessions,s.profile_revision,s.created_at,"
+            "s.revoked_reason,s.revoked_by,s.revoked_at,(s.profile_revision=p.revision) AS revision_valid "
+            "FROM shares s JOIN profiles p ON p.id=s.profile_id"
         )
         args: tuple = ()
         if profile_id:
-            query += " WHERE profile_id=?"
+            query += " WHERE s.profile_id=?"
             args = (profile_id,)
-        query += " ORDER BY created_at DESC"
+        query += " ORDER BY s.created_at DESC"
         with self._connect() as connection:
             rows = connection.execute(query, args).fetchall()
         return [dict(row) for row in rows]
@@ -325,10 +339,16 @@ class GuestStore:
             row = connection.execute("SELECT result_json FROM operations WHERE request_id=?", (request_id,)).fetchone()
         return json.loads(row["result_json"]) if row and row["result_json"] else None
 
-    def revoke_share(self, share_id: str) -> None:
+    def revoke_share(self, share_id: str, *, reason: str, actor_id: str) -> None:
+        reason = reason.strip()
+        if not 3 <= len(reason) <= 200:
+            raise ValueError("Motivazione revoca non valida")
         with self._lock, self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            connection.execute("UPDATE shares SET enabled=0 WHERE id=?", (share_id,))
+            connection.execute(
+                "UPDATE shares SET enabled=0,revoked_reason=?,revoked_by=?,revoked_at=? WHERE id=?",
+                (reason, actor_id, _now(), share_id),
+            )
             connection.execute("UPDATE sessions SET revoked=1 WHERE share_id=?", (share_id,))
             connection.commit()
 

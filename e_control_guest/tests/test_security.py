@@ -119,15 +119,16 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
     assert admin.put(f"/api/admin/cards/{card['id']}/permissions", headers=write,
                      json={"permissions": permissions}).status_code == 200
     assert admin.post(f"/api/admin/profiles/{profile['id']}/shares", headers=write,
-                      json={"pin": None, "valid_minutes": None,
+                      json={"label": "Senza PIN", "pin": None, "valid_minutes": None,
                             "max_sessions": 1}).status_code == 400
     permanent = admin.post(f"/api/admin/profiles/{profile['id']}/shares", headers=write,
-                           json={"pin": "1357", "valid_minutes": None,
+                           json={"label": "Ospite permanente", "pin": "1357", "valid_minutes": None,
                                  "max_sessions": 1})
     assert permanent.status_code == 200
     assert permanent.json()["share"]["expires_at"] > 250_000_000_000
     shared = admin.post(f"/api/admin/profiles/{profile['id']}/shares", headers=write,
-                        json={"pin": "2468", "valid_minutes": 60, "max_sessions": 1}).json()
+                        json={"label": "Ospite temporaneo", "pin": "2468", "valid_minutes": 60,
+                              "max_sessions": 1}).json()
     assert urlsplit(shared["fragment_url"]).path == "/guest-access"
     raw_token = shared["fragment_url"].split("#token=", 1)[1]
     database_text = (runtime.settings.data_dir / "guest.db").read_bytes()
@@ -159,7 +160,14 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
     assert any(x["action"] == "command_readback" for x in runtime.audit.recent(200))
 
     share_id = shared["share"]["id"]
-    assert admin.delete(f"/api/admin/shares/{share_id}", headers=write).status_code == 200
+    assert admin.request("DELETE", f"/api/admin/shares/{share_id}", headers=write,
+                         json={"reason": "Fine soggiorno"}).status_code == 200
+    revoked = next(item for item in admin.get(
+        f"/api/admin/profiles/{profile['id']}", headers=headers).json()["shares"]
+                   if item["id"] == share_id)
+    assert revoked["label"] == "Ospite temporaneo"
+    assert revoked["revoked_reason"] == "Fine soggiorno"
+    assert revoked["revoked_by"] == "admin-1"
     assert guest.get("/api/guest/dashboard").status_code == 401
 
 

@@ -43,7 +43,7 @@ def provision(runtime, *, pin="1234"):
                        "limits": {"brightness": [10, 100]}}
     })
     profile = runtime.store.get_profile(profile["id"])
-    share, token = runtime.store.create_share(profile["id"], pin=pin,
+    share, token = runtime.store.create_share(profile["id"], label="Ospite test", pin=pin,
                                                expires_at=time.time() + 3600, max_sessions=2)
     return share, token, card
 
@@ -115,7 +115,7 @@ def test_guest_flow_revocation_idempotency_and_audit(tmp_path):
         assert first.status_code == second.status_code == 200
         assert first.json() == second.json()
         assert len(adapter.commands) == 1
-        runtime.store.revoke_share(share["id"])
+        runtime.store.revoke_share(share["id"], reason="Fine test", actor_id="test-admin")
         assert client.get("/api/guest/dashboard", headers=headers).status_code == 401
     valid, broken_at = runtime.audit.verify()
     assert valid and broken_at is None
