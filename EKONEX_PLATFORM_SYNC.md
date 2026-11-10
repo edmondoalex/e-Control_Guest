@@ -1,4 +1,19 @@
-## Handoff corrente - RC10 multi-arch pubblicata e qualificata (10/11/2026)
+## Handoff corrente - RC11 layout vista e termostati (10/11/2026)
+
+RC11 aggiunge l'importazione in blocco dell'intera vista mantenendo ordine e
+intestazioni `heading`, e rende il portale Guest una griglia densa responsive.
+Le entita `climate` mostrano stato, temperatura attuale e setpoint; i comandi
+di temperatura e modalita HVAC restano disabilitati per impostazione
+predefinita e richiedono autorizzazione separata. Le `custom:*` continuano a
+essere escluse e non viene eseguito codice Lovelace non controllato.
+
+Commit `66b495a`, tag/release `v0.1.0-rc11`. Qualifica locale: 15 test,
+compileall e controllo sintassi JavaScript PASS. GitHub Actions tag
+`42847705487`: metadati, test e build QEMU `amd64`, `aarch64`, `armv7`, `armhf`
+e `i386` PASS. Il proprietario ha gia installato e collaudato RC10 sul Green
+con Cloudflare; aggiornamento e verifica visiva RC11 restano al proprietario.
+
+## Handoff precedente - RC10 multi-arch pubblicata e qualificata (10/11/2026)
 
 RC10 estende il pacchetto a tutte le architetture add-on Home Assistant:
 `amd64`, `aarch64`, `armv7`, `armhf` e `i386`. La build usa le immagini base
