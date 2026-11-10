@@ -140,6 +140,7 @@ def test_dashboard_reads_all_entities_with_one_bulk_request(tmp_path):
         login(client, token)
         response = client.get("/api/guest/dashboard")
     assert response.status_code == 200
+    assert response.json()["polling_seconds"] == 60
     assert adapter.states_calls == [{"light.sala"}]
     assert adapter.state_calls == []
     actions = [event["action"] for event in runtime.audit.recent()]

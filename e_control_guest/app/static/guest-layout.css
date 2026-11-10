@@ -1,4 +1,6 @@
 .guest main { max-width: none; }
+.guest-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.guest-toolbar h2 { margin: 0; }
 .guest-grid { grid-template-columns: repeat(auto-fit, minmax(285px, 1fr)); align-items: start; }
 .guest-card { border-radius: 10px; }
 .guest-card[data-type="heading"] { grid-column: 1 / -1; background: transparent; border: 0; box-shadow: none; }
@@ -9,4 +11,4 @@
 .climate-detail { display: block; margin-top: 2px; text-align: right; }
 .guest .temperature-control { display: flex; align-items: center; gap: 8px; margin: 0; }
 .guest .temperature-input { width: 96px; min-width: 96px; padding: 8px 10px; text-align: center; font-weight: 800; }
-@media (max-width: 640px) { .guest-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .guest-grid { grid-template-columns: 1fr; } .guest-toolbar { align-items: stretch; flex-direction: column; } }

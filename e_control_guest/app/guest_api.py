@@ -179,7 +179,8 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
             outcome="allowed", metadata={"cards": len(output), "entities": len(readable_ids),
                                            "label": share_label},
         )
-        return {"profile": {"name": value["profile"]["name"]}, "cards": output}
+        return {"profile": {"name": value["profile"]["name"]}, "cards": output,
+                "polling_seconds": runtime.settings.polling_seconds}
 
     @app.post("/api/guest/action")
     async def action(payload: Action, request: Request, current: dict = Depends(write_session)):

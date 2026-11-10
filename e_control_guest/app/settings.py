@@ -12,6 +12,7 @@ class Settings:
     admin_port: int = 8099
     guest_port: int = 8100
     session_minutes: int = 30
+    polling_seconds: int = 60
     audit_retention_days: int = 365
     guest_base_url: str = ""
     allow_insecure_local_http: bool = False
@@ -40,6 +41,7 @@ class Settings:
             data_dir=data_dir,
             guest_port=bounded("guest_port", 8100, 1024, 65535),
             session_minutes=bounded("session_minutes", 30, 5, 240),
+            polling_seconds=bounded("polling_seconds", 60, 15, 3600),
             audit_retention_days=bounded("audit_retention_days", 365, 30, 3650),
             guest_base_url=str(options.get("guest_base_url", "")).strip().rstrip("/"),
             allow_insecure_local_http=options.get("allow_insecure_local_http") is True,
