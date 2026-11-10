@@ -1,4 +1,19 @@
-## Handoff corrente - RC4 installata e avviata (10/11/2026)
+## Handoff corrente - RC7 pubblicata, aggiornamento proprietario pendente (10/11/2026)
+
+Durante il collaudo HTTPS il tunnel Cloudflare e il DNS
+`guest-grupposomet.e-control.tech` sono risultati operativi, ma Google Safe
+Browsing ha bloccato specificamente il percorso pubblico `/share`; la radice
+del portale non risultava bloccata. RC7 sposta pertanto i link generati su
+`/guest-access` e rimuove la route Guest `/share`. I link emessi dalle versioni
+precedenti devono essere revocati e ricreati dopo l'aggiornamento.
+
+Pubblicazione RC7: commit `a1410dc`, tag/release `v0.1.0-rc7`. Qualifica locale:
+14 test PASS e compileall PASS. GitHub Actions tag `42839890816`: test,
+metadati e build Docker amd64 PASS. Aggiornamento Hassio e verifica browser
+reale del nuovo percorso restano al proprietario; nessuna installazione o
+comando reale eseguiti dall'agente.
+
+## Handoff precedente - RC4 installata e avviata (10/11/2026)
 
 CHANGE-2026-058 implementata nel repository owner fino al gate locale. Realizzati
 pacchetto Hassio legacy, processi ASGI separati per amministrazione Ingress e
