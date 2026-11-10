@@ -135,6 +135,10 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
     async def index():
         return FileResponse(STATIC / "admin.html")
 
+    @app.get("/favicon.ico", include_in_schema=False, dependencies=[Depends(require_ingress)])
+    async def favicon():
+        return FileResponse(STATIC / "icon.png", media_type="image/png")
+
     @app.get("/api/admin/bootstrap", dependencies=[Depends(require_ingress)])
     async def bootstrap():
         return {"csrf": runtime.admin_csrf, "action_catalog": ACTION_CATALOG,

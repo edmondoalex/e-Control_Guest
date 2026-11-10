@@ -72,6 +72,16 @@ def test_pin_uses_argon2id_and_rejects_wrong_value():
     assert not verify_pin(digest, "9999")
 
 
+def test_guest_page_has_login_form_and_serves_favicon(tmp_path):
+    runtime, _ = make_runtime(tmp_path)
+    with TestClient(create_guest_app(runtime), base_url="http://guest.test") as client:
+        page = client.get("/guest-access")
+        favicon = client.get("/favicon.ico")
+    assert '<form id="login-form">' in page.text
+    assert favicon.status_code == 200
+    assert favicon.headers["content-type"] == "image/png"
+
+
 def test_importer_rejects_custom_card_and_freezes_safe_snapshot():
     config = {"views": [{"cards": [
         {"type": "custom:unsafe", "entity": "light.bad"},

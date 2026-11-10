@@ -89,6 +89,10 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
     async def share_page():
         return FileResponse(STATIC / "guest.html")
 
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def favicon():
+        return FileResponse(STATIC / "icon.png", media_type="image/png")
+
     @app.post("/api/guest/login")
     async def login(payload: Login, request: Request, response: Response):
         network_id = runtime.network_id(request)
