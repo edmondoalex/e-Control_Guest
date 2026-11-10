@@ -1,3 +1,22 @@
+## Handoff corrente - RC26 pubblicata, branding Ekonex e splash (10/11/2026)
+
+Pubblicata e qualificata RC26. Il portale Guest mostra il marchio Ekonex a
+destra dell'intestazione desktop; su telefono i due blocchi di marca sono
+disposti uno sopra l'altro. Dopo il login compare uno splash Ekonex per almeno
+5 secondi e comunque fino al completamento del caricamento della dashboard.
+
+RC23 ha reso recuperabili e ricopiabili dall'amministrazione i link creati
+dalla stessa versione o successive, senza memorizzare il token in chiaro. RC24
+serve `/favicon.ico` e usa un vero form per il PIN. Gli avvisi browser relativi
+a feature `Permissions-Policy` pubblicitarie non sono emessi dall'applicazione
+e non bloccano il login.
+
+Commit RC26 `24c9e08`, tag/release `v0.1.0-rc26`; 19 test, compileall,
+sintassi JavaScript e diff-check locali PASS. GitHub Actions tag
+`42873237159`: test, metadati e build `amd64`, `aarch64`, `armv7`, `armhf` e
+`i386` PASS. Asset Ekonex preparato dall'immagine fornita dal proprietario.
+Installazione e verifica visiva sull'impianto restano al proprietario.
+
 ## Handoff corrente - RC18 pubblicata, nomi Home Assistant (10/11/2026)
 
 Pubblicata RC18. Nella configurazione dei permessi il nome principale
