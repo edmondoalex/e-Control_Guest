@@ -150,9 +150,9 @@ Aggiornamento del proprietario: RC4 installata e avviata. Installazione e avvio
 non sono ancora accettazione funzionale. Prossimo passo: collaudo read-only di
 Ingress, persistenza, creazione profilo/link, accesso Guest HTTPS, revoca e
 integrita audit. Comandi reali esclusi fino a indicazione esplicita.
-## Handoff corrente - RC19 locale, link stabili fino alla revoca (10/11/2026)
+## Handoff corrente - RC19 pubblicata, link stabili fino alla revoca (10/11/2026)
 
-Preparata localmente RC19. Le revisioni dovute a modifica permessi,
+Pubblicata e qualificata RC19. Le revisioni dovute a modifica permessi,
 salvataggio cumulativo o rimozione di schede non invalidano piu link e sessioni
 Guest: i nuovi permessi diventano effettivi immediatamente sul medesimo
 accesso. Un link permanente termina soltanto con revoca amministrativa; un link
@@ -160,7 +160,8 @@ temporaneo termina con revoca oppure alla scadenza configurata. La
 disattivazione esplicita dell'intero profilo resta fail-closed e revoca le
 sessioni, mentre la revoca del link conserva motivazione e autore.
 
-Versione predisposta `0.1.0-rc19`. Qualifica locale: 16 test, compileall,
-sintassi JavaScript admin/guest e diff-check PASS. Nessun accesso a impianti,
-push, tag, release o installazione eseguiti. Prossimo gate: autorizzazione
-esplicita del proprietario alla pubblicazione RC19.
+Commit `2877ea2`, tag/release `v0.1.0-rc19`. Qualifica locale: 16 test,
+compileall, sintassi JavaScript admin/guest e diff-check PASS. GitHub Actions
+tag `42866370485`: test, metadati e build `amd64`, `aarch64`, `armv7`, `armhf`
+e `i386` PASS. Nessun accesso a impianti o installazione eseguito;
+aggiornamento e collaudo restano al proprietario.
