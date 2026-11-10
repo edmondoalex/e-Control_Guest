@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import secrets
 import uuid
 from pathlib import Path
@@ -134,6 +133,22 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
             raise HTTPException(404, "Profilo non disponibile") from exc
         output = []
         share_label = runtime.store.get_share(current["sh"]).get("label", "")
+        readable_ids = {
+            entity["entity_id"]
+            for card in value["cards"]
+            for entity in card["config"]["entities"]
+            if card["permissions"].get(entity["entity_id"], {}).get("read", False)
+        }
+        try:
+            if hasattr(runtime.adapter, "states"):
+                current_states = await runtime.adapter.states(readable_ids)
+            else:
+                current_states = {
+                    entity_id: await runtime.adapter.state(entity_id)
+                    for entity_id in readable_ids
+                }
+        except Exception:
+            current_states = {}
         for card in value["cards"]:
             if card["config"]["type"] == "heading":
                 output.append({"id": card["id"], "title": card["title"], "type": "heading",
@@ -146,30 +161,23 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
                 if not policy.get("read", False):
                     continue
                 try:
-                    state = public_state(await runtime.adapter.state(entity_id))
+                    state = public_state(current_states[entity_id])
                     states.append({**state, "name": entity.get("name") or "",
                                    "icon": entity.get("icon") or "",
                                    "actions": policy.get("actions", []),
                                    "limits": policy.get("limits", {})})
-                    outcome = "allowed"
-                except Exception:
+                except (KeyError, TypeError, ValueError):
                     states.append({"entity_id": entity_id, "state": "unavailable", "attributes": {},
                                    "name": entity.get("name") or "", "icon": entity.get("icon") or "",
                                    "actions": [], "limits": {}})
-                    outcome = "error"
-                runtime.audit.append(
-                    actor_type="guest", actor_id=runtime.user_agent_id(request),
-                    session_id=current["sid"], action="state_read", resource=entity_id,
-                    outcome=outcome, metadata={"label": share_label,
-                                               "entity_name": entity.get("name") or entity_id},
-                )
             output.append({"id": card["id"], "title": card["title"],
                            "type": card["config"]["type"],
                            "appearance": card["config"].get("appearance", {}), "states": states})
         runtime.audit.append(
             actor_type="guest", actor_id=runtime.user_agent_id(request),
             session_id=current["sid"], action="dashboard_view", resource=current["pr"],
-            outcome="allowed", metadata={"cards": len(output), "label": share_label},
+            outcome="allowed", metadata={"cards": len(output), "entities": len(readable_ids),
+                                           "label": share_label},
         )
         return {"profile": {"name": value["profile"]["name"]}, "cards": output}
 

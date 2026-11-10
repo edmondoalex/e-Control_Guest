@@ -18,9 +18,19 @@ from app.settings import Settings
 class FakeAdapter:
     def __init__(self):
         self.commands = []
+        self.state_calls = []
+        self.states_calls = []
 
     async def state(self, entity_id):
+        self.state_calls.append(entity_id)
         return {"entity_id": entity_id, "state": "on", "attributes": {}}
+
+    async def states(self, entity_ids):
+        self.states_calls.append(set(entity_ids))
+        return {
+            entity_id: {"entity_id": entity_id, "state": "on", "attributes": {}}
+            for entity_id in entity_ids
+        }
 
     async def execute(self, command):
         self.commands.append(command)
@@ -121,6 +131,20 @@ def test_guest_flow_revocation_idempotency_and_audit(tmp_path):
     assert valid and broken_at is None
     actions = [event["action"] for event in runtime.audit.recent()]
     assert "command_request" in actions and "command_readback" in actions and "session_check" in actions
+
+
+def test_dashboard_reads_all_entities_with_one_bulk_request(tmp_path):
+    runtime, adapter = make_runtime(tmp_path)
+    _, token, _ = provision(runtime)
+    with TestClient(create_guest_app(runtime), base_url="http://guest.test") as client:
+        login(client, token)
+        response = client.get("/api/guest/dashboard")
+    assert response.status_code == 200
+    assert adapter.states_calls == [{"light.sala"}]
+    assert adapter.state_calls == []
+    actions = [event["action"] for event in runtime.audit.recent()]
+    assert actions.count("dashboard_view") == 1
+    assert "state_read" not in actions
 
 
 def test_link_and_active_session_survive_profile_changes_until_manual_revoke(tmp_path):

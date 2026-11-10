@@ -153,9 +153,9 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
     assert view.status_code == 200
     assert view.json()["cards"][0]["states"][0]["state"] == "off"
     audit_events = admin.get("/api/admin/audit", headers=headers).json()["events"]
-    guest_reads = [event for event in audit_events if event["action"] == "state_read"]
-    assert guest_reads[0]["metadata"]["label"] == "Ospite temporaneo"
-    assert guest_reads[0]["metadata"]["entity_name"] == "Tasting Room"
+    guest_views = [event for event in audit_events if event["action"] == "dashboard_view"]
+    assert guest_views[0]["metadata"]["label"] == "Ospite temporaneo"
+    assert guest_views[0]["metadata"]["entities"] == 1
 
     request_id = "b3b55223-6632-4135-9314-a1765fc0a25d"
     action = {"request_id": request_id, "card_id": card["id"],
@@ -171,7 +171,8 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
               "entity_id": "switch.not_shared"}
     assert guest.post("/api/guest/action", headers={"X-eControl-CSRF": csrf}, json=denied).status_code == 403
     assert runtime.audit.verify() == (True, None)
-    assert any(x["action"] == "command_readback" for x in runtime.audit.recent(200))
+    command_events = [x for x in runtime.audit.recent(200) if x["action"] == "command_readback"]
+    assert command_events[0]["metadata"]["entity_name"] == "Tasting Room"
 
     share_id = shared["share"]["id"]
     assert admin.request("DELETE", f"/api/admin/shares/{share_id}", headers=write,
