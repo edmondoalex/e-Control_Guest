@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from pathlib import Path
 from typing import Any
@@ -77,6 +78,35 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
                 except PolicyDenied as exc:
                     raise HTTPException(400, str(exc)) from exc
 
+    async def enrich_entity_names(dashboard: dict) -> dict:
+        entities = [
+            entity for card in dashboard.get("cards", [])
+            for entity in card.get("config", {}).get("entities", [])
+            if not entity.get("name")
+        ]
+        entity_ids = {str(entity.get("entity_id", "")) for entity in entities}
+        entity_ids.discard("")
+        try:
+            if hasattr(runtime.adapter, "states"):
+                states = await runtime.adapter.states(entity_ids)
+            else:
+                values = await asyncio.gather(
+                    *(runtime.adapter.state(entity_id) for entity_id in entity_ids),
+                    return_exceptions=True,
+                )
+                states = {
+                    str(value.get("entity_id")): value for value in values
+                    if isinstance(value, dict) and value.get("entity_id")
+                }
+        except Exception:
+            return dashboard
+        for entity in entities:
+            state = states.get(entity.get("entity_id"), {})
+            friendly_name = state.get("attributes", {}).get("friendly_name")
+            if friendly_name:
+                entity["name"] = str(friendly_name)[:100]
+        return dashboard
+
     async def require_ingress(request: Request) -> None:
         if runtime.settings.development_admin:
             return
@@ -125,7 +155,8 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
     @app.get("/api/admin/profiles/{profile_id}", dependencies=[Depends(require_ingress)])
     async def profile(profile_id: str):
         try:
-            return {"dashboard": runtime.store.dashboard(profile_id),
+            dashboard = await enrich_entity_names(runtime.store.dashboard(profile_id))
+            return {"dashboard": dashboard,
                     "shares": runtime.store.list_shares(profile_id)}
         except KeyError as exc:
             raise HTTPException(404, "Profilo non trovato") from exc

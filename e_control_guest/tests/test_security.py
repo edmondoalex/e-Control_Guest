@@ -114,6 +114,8 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
     card = admin.post(f"/api/admin/profiles/{profile['id']}/cards/import", headers=write,
                       json={"dashboard": "manual", "source_ref": safe["source_ref"],
                             "config": dashboard_config()}).json()
+    profile_view = admin.get(f"/api/admin/profiles/{profile['id']}", headers=headers).json()
+    assert profile_view["dashboard"]["cards"][0]["config"]["entities"][0]["name"] == "Tasting Room"
     permissions = {"light.tasting": {"read": True, "actions": ["turn_on", "turn_off"],
                                       "limits": {}}}
     assert admin.put(f"/api/admin/cards/{card['id']}/permissions", headers=write,

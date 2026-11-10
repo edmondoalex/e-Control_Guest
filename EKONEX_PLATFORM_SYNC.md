@@ -1,3 +1,20 @@
+## Handoff corrente - RC18 locale, nomi Home Assistant (10/11/2026)
+
+Preparata localmente RC18. Nella configurazione dei permessi il nome principale
+e ora il nome descrittivo Home Assistant (`friendly_name`), mentre l'ID entita
+resta visibile sotto in piccolo come riferimento tecnico. Un nome esplicito
+della scheda Lovelace conserva la priorita. Il recupero usa una sola lettura
+bulk degli stati sul runtime Hassio e un fallback compatibile per gli adapter
+di test; in caso di indisponibilita resta l'ID senza bloccare l'amministrazione.
+
+La risoluzione avviene anche per schede gia importate e non modifica snapshot,
+permessi o link. Il pulsante `Copia link` usa Clipboard API quando consentita e
+un fallback compatibile con Home Assistant Ingress, mostrando l'esito. Un nuovo
+token nell'URL prevale sempre su eventuali sessioni browser residue; una
+sessione scaduta o invalida torna al login con un messaggio invece di lasciare
+la dashboard vuota. Versione predisposta `0.1.0-rc18`; 15 test, compileall,
+sintassi JavaScript e diff-check PASS. Pubblicazione e installazione pendenti.
+
 ## Handoff corrente - RC17 pubblicata, permessi cumulativi e identita Guest (10/11/2026)
 
 Pubblicata RC17. La pagina amministrativa offre `Salva tutti i

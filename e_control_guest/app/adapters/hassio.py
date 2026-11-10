@@ -29,6 +29,26 @@ class HassioAdapter:
         data = response.json()
         return {"entity_id": data.get("entity_id"), "state": data.get("state"), "attributes": data.get("attributes", {})}
 
+    async def states(self, entity_ids: set[str]) -> dict[str, dict]:
+        if not entity_ids:
+            return {}
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.get(
+                f"{self.base_url}/core/api/states", headers=self._headers()
+            )
+        response.raise_for_status()
+        values = response.json()
+        if not isinstance(values, list):
+            raise RuntimeError("Elenco stati Home Assistant non valido")
+        return {
+            str(item["entity_id"]): {
+                "entity_id": item["entity_id"], "state": item.get("state"),
+                "attributes": item.get("attributes", {}),
+            }
+            for item in values
+            if isinstance(item, dict) and item.get("entity_id") in entity_ids
+        }
+
     async def execute(self, command: Command) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
