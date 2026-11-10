@@ -1,0 +1,9 @@
+{
+  "build_from": {
+    "amd64": "ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20"
+  },
+  "labels": {
+    "org.opencontainers.image.title": "e-Control Guest",
+    "org.opencontainers.image.source": "https://github.com/edmondoalex/e-Control_Guest"
+  }
+}

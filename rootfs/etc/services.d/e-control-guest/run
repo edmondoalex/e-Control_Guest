@@ -1,0 +1,4 @@
+#!/usr/bin/with-contenv sh
+set -eu
+cd /opt/e-control-guest
+exec python3 -m app
