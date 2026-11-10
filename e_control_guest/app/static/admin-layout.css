@@ -1,4 +1,16 @@
-.permission-tools { display: grid; grid-template-columns: minmax(220px, 1fr) auto auto auto; gap: 10px; margin-bottom: 16px; }
+.section-collapse > summary { display: flex; align-items: center; gap: 12px; cursor: pointer; list-style: none; }
+.section-collapse > summary::-webkit-details-marker { display: none; }
+.section-collapse > summary::before { content: "›"; color: var(--cyan); font-size: 30px; line-height: 1; transition: transform .15s; }
+.section-collapse[open] > summary::before { transform: rotate(90deg); }
+.section-collapse > summary h2 { margin: 0; }
+.section-collapse-body { padding-top: 18px; }
+.share-edit { display: grid; grid-template-columns: minmax(130px, 1fr) auto minmax(130px, 1fr) auto; gap: 10px; align-items: end; margin-top: 12px; }
+.share-edit label { margin: 0; }
+.share-edit .share-permanent { align-self: center; white-space: nowrap; }
+.share-edit .share-permanent input { width: auto; }
+.share-actions { margin-top: 10px; }
+.permission-tools { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(5, auto); gap: 10px; margin-bottom: 16px; }
+.audit-tools { display: grid; grid-template-columns: minmax(260px, 1fr) auto auto auto; gap: 10px; align-items: center; }
 .permission-card { padding: 0; overflow: hidden; }
 .permission-card > summary { display: flex; align-items: center; gap: 12px; padding: 16px 18px; cursor: pointer; list-style: none; }
 .permission-card > summary::-webkit-details-marker { display: none; }
@@ -10,4 +22,4 @@
 .permission-body { padding: 0 18px 18px; border-top: 1px solid var(--line); }
 .permission-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
 .permission-card.filtered-out { display: none; }
-@media (max-width: 760px) { .permission-tools { grid-template-columns: 1fr 1fr; } .permission-tools input, #save-all-permissions { grid-column: 1 / -1; } .permission-card > summary { align-items: flex-start; } }
+@media (max-width: 760px) { .permission-tools { grid-template-columns: 1fr 1fr; } .permission-tools input, #save-all-permissions { grid-column: 1 / -1; } .permission-card > summary { align-items: flex-start; } .share-edit { grid-template-columns: 1fr; } .audit-tools { grid-template-columns: 1fr; } }

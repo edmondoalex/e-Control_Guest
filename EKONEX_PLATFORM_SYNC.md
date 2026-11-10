@@ -237,3 +237,37 @@ Commit RC22 `c67bddb`, tag/release `v0.1.0-rc22`; 17 test, compileall,
 sintassi JavaScript e diff-check locali PASS. GitHub Actions tag `42868920169`:
 test, metadati e build `amd64`, `aarch64`, `armv7`, `armhf`, `i386` PASS.
 Installazione e verifica del recupero CPU/assenza 524 restano al proprietario.
+## Handoff corrente - PWA, JSON e audit limitato, delta locale (10/11/2026)
+
+Su richiesta del proprietario, la sezione amministrativa `3. Contenuto e
+permessi` e ora chiusa per impostazione predefinita e si espande cliccando sul
+titolo. Le singole schede interne conservano il proprio collasso indipendente.
+I link attivi offrono inoltre la modifica in corso dei minuti residui, della
+modalita senza scadenza e del massimo di sessioni simultanee, senza cambiare
+token o PIN. Una riduzione del limite conserva le sessioni piu recenti e revoca
+subito quelle eccedenti; una scadenza accorciata limita immediatamente anche le
+sessioni aperte. Ogni modifica viene registrata nell'audit amministrativo.
+
+File prodotto interessati: `app/admin_api.py`, `app/storage.py`,
+`app/static/admin.html`, `admin-layout.css` e `admin.js`, con test di
+regressione API/UI/storage.
+
+Il portale Guest e ora predisposto come PWA installabile: manifest standalone,
+icone reali 192/512, service worker network-only e pulsante installazione. API,
+token, PIN e dati Home Assistant non vengono messi in cache. La sezione
+contenuto permette inoltre export e import JSON di sole schede e permessi;
+token, PIN, sessioni e audit sono esclusi. L'import sostituisce atomicamente le
+schede del profilo, conserva i link e rifiuta tipi custom, entita, azioni o
+permessi non validi.
+
+Il Registro completo dispone di filtro client sugli ultimi 1000 eventi e
+mostra conteggio, dimensione, retention e tetto massimo. Corretto il testo
+`undefined dispositivi`. La retention configurata e ora realmente applicata;
+aggiunta opzione `audit_max_events` default 100000. La potatura giornaliera usa
+un anchor HMAC firmato, tronca WAL e compatta SQLite senza interrompere la
+catena verificabile.
+
+Verifiche finali: 24 test PASS, compileall, `node --check` su admin/Guest/service
+worker, validazione manifest/config JSON e `git diff --check` PASS. Delta solo
+locale sulla base RC30: nessun incremento versione, commit, push, release,
+catalogo, installazione o comando reale.

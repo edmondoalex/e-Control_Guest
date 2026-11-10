@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import time
 from pathlib import Path
 from typing import Any
@@ -11,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .dashboard_client import DashboardUnavailable
-from .importer import inspect_dashboard, snapshot
+from .importer import SAFE_CARD_TYPES, inspect_dashboard, snapshot
 from .policy import ACTION_CATALOG, PolicyDenied, authorize
 from .runtime import Runtime
 from .storage import StoreError
@@ -48,6 +50,11 @@ class ProfilePermissionUpdate(BaseModel):
     cards: dict[str, dict[str, dict]]
 
 
+class ProfileContentImport(BaseModel):
+    schema_version: int
+    cards: list[dict[str, Any]] = Field(max_length=500)
+
+
 class ShareCreate(BaseModel):
     label: str = Field(min_length=1, max_length=100)
     pin: str | None = Field(default=None, min_length=4, max_length=12)
@@ -57,6 +64,11 @@ class ShareCreate(BaseModel):
 
 class ShareRevoke(BaseModel):
     reason: str = Field(min_length=3, max_length=200)
+
+
+class ShareUpdate(BaseModel):
+    valid_minutes: int | None = Field(default=None, ge=5, le=43200)
+    max_sessions: int = Field(ge=1, le=20)
 
 
 def create_admin_app(runtime: Runtime) -> FastAPI:
@@ -71,13 +83,54 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
         probes = {"set_temperature": 20, "set_brightness": 1, "set_position": 1,
                   "set_hvac_mode": "off"}
         for entity_id, policy in permissions.items():
-            if not isinstance(policy, dict) or not isinstance(policy.get("actions"), list):
+            if not isinstance(policy, dict) or set(policy) != {"read", "actions", "limits"} \
+                    or not isinstance(policy.get("read"), bool) \
+                    or not isinstance(policy.get("actions"), list) \
+                    or not isinstance(policy.get("limits"), dict):
                 raise HTTPException(400, "Permessi non validi")
             for action in policy["actions"]:
                 try:
                     authorize({entity_id: policy}, entity_id, action, probes.get(action))
                 except PolicyDenied as exc:
                     raise HTTPException(400, str(exc)) from exc
+
+    def imported_snapshots(payload: ProfileContentImport) -> list[dict]:
+        if payload.schema_version != 1:
+            raise HTTPException(400, "Versione JSON non supportata")
+        snapshots = []
+        for index, item in enumerate(payload.cards):
+            if not isinstance(item, dict) or set(item) != {"title", "config", "permissions"}:
+                raise HTTPException(400, f"Scheda JSON {index + 1} non valida")
+            config, permissions = item["config"], item["permissions"]
+            if not isinstance(config, dict) or set(config) != {"type", "appearance", "entities"}:
+                raise HTTPException(400, f"Configurazione scheda {index + 1} non valida")
+            if config["type"] not in SAFE_CARD_TYPES:
+                raise HTTPException(400, f"Tipo scheda non consentito: {config['type']}")
+            if not isinstance(config["appearance"], dict) or not isinstance(config["entities"], list):
+                raise HTTPException(400, f"Contenuto scheda {index + 1} non valido")
+            if len(config["entities"]) > 500:
+                raise HTTPException(400, "Troppe entita in una scheda")
+            entity_ids = []
+            for entity in config["entities"]:
+                if not isinstance(entity, dict) or set(entity) != {"entity_id", "name", "icon"}:
+                    raise HTTPException(400, f"Entita scheda {index + 1} non valida")
+                entity_id = entity["entity_id"]
+                if not isinstance(entity_id, str) or "." not in entity_id or len(entity_id) > 255:
+                    raise HTTPException(400, "ID entita non valido")
+                entity_ids.append(entity_id)
+            if len(entity_ids) != len(set(entity_ids)):
+                raise HTTPException(400, "Entita duplicate nella scheda")
+            validate_permissions({"config": config}, permissions)
+            canonical = json.dumps(config, ensure_ascii=False, sort_keys=True,
+                                   separators=(",", ":")).encode("utf-8")
+            snapshots.append({
+                "source_ref": f"json-import[{index}]",
+                "source_hash": hashlib.sha256(canonical).hexdigest(),
+                "title": str(item["title"])[:100],
+                "type": config["type"], "appearance": config["appearance"],
+                "entities": config["entities"], "permissions": permissions,
+            })
+        return snapshots
 
     async def enrich_entity_names(dashboard: dict) -> dict:
         entities = [
@@ -279,6 +332,37 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
         )
         return updated
 
+    @app.get("/api/admin/profiles/{profile_id}/content-export", dependencies=[Depends(require_ingress)])
+    async def content_export(profile_id: str, request: Request):
+        try:
+            dashboard = runtime.store.dashboard(profile_id)
+        except KeyError as exc:
+            raise HTTPException(404, "Profilo non trovato") from exc
+        cards = [{"title": card["title"], "config": card["config"],
+                  "permissions": card["permissions"]} for card in dashboard["cards"]]
+        runtime.audit.append(
+            actor_type="admin", actor_id=request.headers.get("x-hass-user-id", "ingress"),
+            action="content_export", resource=profile_id, outcome="allowed",
+            metadata={"card_count": len(cards)},
+        )
+        return {"schema_version": 1, "product": "e-Control Guest",
+                "profile_name": dashboard["profile"]["name"], "cards": cards}
+
+    @app.post("/api/admin/profiles/{profile_id}/content-import", dependencies=[Depends(require_csrf)])
+    async def content_import(profile_id: str, payload: ProfileContentImport, request: Request):
+        snapshots = imported_snapshots(payload)
+        try:
+            dashboard = runtime.store.replace_profile_cards(profile_id, snapshots)
+        except KeyError as exc:
+            raise HTTPException(404, "Profilo non trovato o disattivato") from exc
+        runtime.audit.append(
+            actor_type="admin", actor_id=request.headers.get("x-hass-user-id", "ingress"),
+            action="content_import", resource=profile_id, outcome="allowed",
+            metadata={"card_count": len(snapshots),
+                      "entity_count": sum(len(card["entities"]) for card in snapshots)},
+        )
+        return dashboard
+
     @app.post("/api/admin/profiles/{profile_id}/shares", dependencies=[Depends(require_csrf)])
     async def create_share(profile_id: str, payload: ShareCreate, request: Request):
         if payload.valid_minutes is None and not payload.pin:
@@ -299,6 +383,28 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
                                        "pin_required": bool(payload.pin)})
         return {"share": share,
                 "fragment_url": f"{runtime.settings.guest_base_url}/guest-access#token={token}"}
+
+    @app.put("/api/admin/shares/{share_id}", dependencies=[Depends(require_csrf)])
+    async def update_share(share_id: str, payload: ShareUpdate, request: Request):
+        expires_at = (PERMANENT_EXPIRES_AT if payload.valid_minutes is None
+                      else time.time() + payload.valid_minutes * 60)
+        try:
+            result = runtime.store.update_share_limits(
+                share_id, expires_at=expires_at, max_sessions=payload.max_sessions,
+            )
+        except KeyError as exc:
+            raise HTTPException(404, "Link non trovato") from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        runtime.audit.append(
+            actor_type="admin", actor_id=request.headers.get("x-hass-user-id", "ingress"),
+            action="share_update", resource=share_id, outcome="allowed",
+            metadata={"label": result["share"].get("label", ""),
+                      "expires_at": result["share"]["expires_at"],
+                      "max_sessions": result["share"]["max_sessions"],
+                      "sessions_revoked": result["sessions_revoked"]},
+        )
+        return result
 
     @app.delete("/api/admin/shares/{share_id}", dependencies=[Depends(require_csrf)])
     async def revoke_share(share_id: str, payload: ShareRevoke, request: Request):
@@ -335,6 +441,7 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
             label = runtime.store.share_label_for_session(event.get("session_id", ""))
             if label:
                 event["metadata"]["label"] = label
-        return {"valid": valid, "broken_at": broken_at, "events": events}
+        return {"valid": valid, "broken_at": broken_at, "events": events,
+                "stats": runtime.audit.stats()}
 
     return app

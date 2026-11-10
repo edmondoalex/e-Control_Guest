@@ -4,6 +4,7 @@ import sqlite3
 import time
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.audit import AuditLog
@@ -13,6 +14,7 @@ from app.importer import inspect_dashboard, snapshot
 from app.policy import PolicyDenied, authorize
 from app.runtime import build_runtime
 from app.settings import Settings
+from app.storage import StoreError
 
 
 class FakeAdapter:
@@ -235,6 +237,44 @@ def test_same_browser_replaces_its_session_without_consuming_another_slot(tmp_pa
             )
             assert denied.status_code == 409
             assert denied.json()["detail"].startswith("Limite di sessioni simultanee")
+
+
+def test_updating_share_limits_revokes_excess_sessions_immediately(tmp_path):
+    runtime = build_runtime(
+        Settings(data_dir=tmp_path, development_admin=True, session_minutes=30,
+                 allow_insecure_local_http=True),
+        adapter=FakeAdapter(),
+    )
+    profile = runtime.store.create_profile("Limiti")
+    share, token = runtime.store.create_share(
+        profile["id"], label="Limiti", pin="123456",
+        expires_at=time.time() + 3600, max_sessions=3,
+    )
+    sessions = []
+    for index in range(3):
+        sessions.append(runtime.store.authenticate_share(
+            token, "123456", csrf_token=f"csrf-{index}", device_token=f"device-{index}",
+            lifetime_seconds=1800,
+        ))
+        time.sleep(0.002)
+
+    new_expiry = time.time() + 600
+    result = runtime.store.update_share_limits(
+        share["id"], expires_at=new_expiry, max_sessions=1,
+    )
+    assert result["share"]["max_sessions"] == 1
+    assert result["sessions_revoked"] == 2
+    assert result["share"]["expires_at"] == pytest.approx(new_expiry)
+
+    newest = sessions[-1]
+    runtime.store.validate_session(
+        newest["id"], newest["share_id"], newest["profile_id"], newest["profile_revision"],
+    )
+    for old in sessions[:-1]:
+        with pytest.raises(StoreError, match="session_unavailable"):
+            runtime.store.validate_session(
+                old["id"], old["share_id"], old["profile_id"], old["profile_revision"],
+            )
 
 
 def test_audit_chain_detects_tampering(tmp_path):

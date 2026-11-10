@@ -68,6 +68,14 @@ def test_generated_dashboard_returns_readable_error():
         inspect_dashboard({"strategy": {"type": "map"}}, "map")
 
 
+def test_permissions_section_is_collapsed_by_default():
+    html = (Path(__file__).parents[1] / "app" / "static" / "admin.html").read_text(encoding="utf-8")
+    marker = '<details class="section-collapse">'
+    assert marker in html
+    assert '<details class="section-collapse" open>' not in html
+    assert html.index(marker) < html.index("3. Contenuto e permessi") < html.index("card-filter")
+
+
 def test_policy_is_fail_closed_and_checks_limits():
     permissions = {"light.tasting": {"actions": ["set_brightness"],
                                       "limits": {"brightness": [10, 100]}}}
@@ -100,6 +108,21 @@ def test_audit_redacts_secrets_and_detects_tampering(tmp_path: Path):
     assert audit.verify() == (False, 1)
 
 
+def test_audit_retention_uses_signed_anchor_and_remains_appendable(tmp_path: Path):
+    audit = AuditLog(tmp_path / "retained-audit.db", b"r" * 32, retention_days=30,
+                     max_events=1000)
+    old = audit.append(actor_type="test", action="old", outcome="allowed",
+                       occurred_at="2020-01-01T00:00:00+00:00")
+    result = audit.prune()
+    assert result["deleted"] == 1
+    assert audit.stats()["events"] == 0
+    assert audit.stats()["archived_events"] == old["seq"]
+    current = audit.append(actor_type="test", action="current", outcome="allowed")
+    assert current["seq"] == old["seq"] + 1
+    assert current["previous_hash"] == old["event_hash"]
+    assert audit.verify() == (True, None)
+
+
 def test_end_to_end_share_login_read_command_and_revoke(runtime):
     admin = TestClient(create_admin_app(runtime))
     guest = TestClient(create_guest_app(runtime))
@@ -128,6 +151,23 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
     assert saved_all.status_code == 200
     assert saved_all.json()["profile"]["revision"] == revision + 1
     assert saved_all.json()["cards"][0]["permissions"] == permissions
+    exported = admin.get(
+        f"/api/admin/profiles/{profile['id']}/content-export", headers=headers
+    )
+    assert exported.status_code == 200
+    assert exported.json()["schema_version"] == 1
+    rejected = json.loads(exported.text)
+    rejected["cards"][0]["config"]["type"] = "custom:unsafe"
+    assert admin.post(
+        f"/api/admin/profiles/{profile['id']}/content-import", headers=write, json=rejected
+    ).status_code == 400
+    restored = admin.post(
+        f"/api/admin/profiles/{profile['id']}/content-import", headers=write,
+        json=exported.json(),
+    )
+    assert restored.status_code == 200
+    card = restored.json()["cards"][0]
+    assert card["permissions"] == permissions
     assert admin.post(f"/api/admin/profiles/{profile['id']}/shares", headers=write,
                       json={"label": "Senza PIN", "pin": None, "valid_minutes": None,
                             "max_sessions": 1}).status_code == 400
@@ -139,6 +179,14 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
     shared = admin.post(f"/api/admin/profiles/{profile['id']}/shares", headers=write,
                         json={"label": "Ospite temporaneo", "pin": "2468", "valid_minutes": 60,
                               "max_sessions": 1}).json()
+    updated = admin.put(
+        f"/api/admin/shares/{shared['share']['id']}", headers=write,
+        json={"valid_minutes": 120, "max_sessions": 2},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["share"]["max_sessions"] == 2
+    assert updated.json()["share"]["expires_at"] > time.time() + 119 * 60
+    assert updated.json()["sessions_revoked"] == 0
     assert urlsplit(shared["fragment_url"]).path == "/guest-access"
     raw_token = shared["fragment_url"].split("#token=", 1)[1]
     database_text = (runtime.settings.data_dir / "guest.db").read_bytes()
@@ -196,7 +244,21 @@ def test_guest_entry_uses_dedicated_non_share_path(runtime):
     assert 'src="static/ekonex-logo.png"' in page.text
     assert 'id="loading-splash"' in page.text
     assert 'id="login-form"' in page.text
-    assert "const splashMinimumMs=5000" in (Path(__file__).parents[1] / "app/static/guest.js").read_text()
+    assert 'rel="manifest" href="static/manifest.webmanifest"' in page.text
+    assert 'id="install-app"' in page.text
+    guest_js = (Path(__file__).parents[1] / "app/static/guest.js").read_text()
+    assert "const splashMinimumMs=5000" in guest_js
+    assert "navigator.serviceWorker.register('/service-worker.js'" in guest_js
+    manifest = guest.get("/static/manifest.webmanifest")
+    assert manifest.status_code == 200
+    assert manifest.json()["start_url"] == "/guest-access"
+    assert manifest.json()["display"] == "standalone"
+    assert {icon["sizes"] for icon in manifest.json()["icons"]} == {"192x192", "512x512"}
+    worker = guest.get("/service-worker.js")
+    assert worker.status_code == 200
+    assert worker.headers["service-worker-allowed"] == "/"
+    assert "caches.open" not in worker.text
+    assert "fetch(event.request)" in worker.text
     assert guest.get("/share").status_code == 404
 
 

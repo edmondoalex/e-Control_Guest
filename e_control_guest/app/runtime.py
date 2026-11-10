@@ -57,7 +57,9 @@ def build_runtime(settings: Settings | None = None, *, adapter: object | None = 
     token_key = secrets_store.get("token-digest")
     return Runtime(
         settings=settings,
-        audit=AuditLog(settings.data_dir / "audit.db", secrets_store.get("audit-chain")),
+        audit=AuditLog(settings.data_dir / "audit.db", secrets_store.get("audit-chain"),
+                       retention_days=settings.audit_retention_days,
+                       max_events=settings.audit_max_events),
         store=GuestStore(settings.data_dir / "guest.db", token_key),
         signer=SessionSigner(secrets_store.get("session-signing")),
         adapter=adapter or HassioAdapter(settings.supervisor_url, settings.supervisor_token),

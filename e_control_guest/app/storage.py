@@ -245,6 +245,34 @@ class GuestStore:
             })
         return {"profile": profile, "cards": cards}
 
+    def replace_profile_cards(self, profile_id: str, snapshots: list[dict]) -> dict:
+        now = _now()
+        with self._lock, self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            profile = connection.execute(
+                "SELECT active FROM profiles WHERE id=?", (profile_id,),
+            ).fetchone()
+            if profile is None or not profile["active"]:
+                raise KeyError(profile_id)
+            connection.execute("DELETE FROM cards WHERE profile_id=?", (profile_id,))
+            for index, item in enumerate(snapshots):
+                card_id = str(uuid.uuid4())
+                config = {key: item[key] for key in ("type", "appearance", "entities")}
+                connection.execute(
+                    "INSERT INTO cards VALUES (?,?,?,?,?,?,?,?,?)",
+                    (card_id, profile_id, str(item["title"])[:100],
+                     str(item.get("source_ref") or f"json-import[{index}]")[:300],
+                     str(item["source_hash"]), json.dumps(config, separators=(",", ":")),
+                     json.dumps(item["permissions"], separators=(",", ":")),
+                     now + index / 1000, now + index / 1000),
+                )
+            connection.execute(
+                "UPDATE profiles SET revision=revision+1,updated_at=? WHERE id=?",
+                (now, profile_id),
+            )
+            connection.commit()
+        return self.dashboard(profile_id)
+
     def create_share(self, profile_id: str, *, label: str = "", pin: str | None, expires_at: float,
                      max_sessions: int = 1) -> tuple[dict, str]:
         profile = self.get_profile(profile_id)
@@ -314,6 +342,45 @@ class GuestStore:
         with self._connect() as connection:
             rows = connection.execute(query, args).fetchall()
         return [dict(row) for row in rows]
+
+    def update_share_limits(self, share_id: str, *, expires_at: float,
+                            max_sessions: int) -> dict:
+        now = _now()
+        if expires_at <= now:
+            raise ValueError("La nuova scadenza deve essere futura")
+        if not 1 <= int(max_sessions) <= 20:
+            raise ValueError("Numero sessioni non valido")
+        with self._lock, self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            share = connection.execute(
+                "SELECT enabled,expires_at,pin_hash FROM shares WHERE id=?", (share_id,),
+            ).fetchone()
+            if share is None:
+                raise KeyError(share_id)
+            if not share["enabled"] or share["expires_at"] <= now:
+                raise ValueError("Il link non e attivo")
+            if expires_at >= 250_000_000_000 and not share["pin_hash"]:
+                raise ValueError("Il PIN e obbligatorio per i link senza scadenza")
+            connection.execute(
+                "UPDATE shares SET expires_at=?,max_sessions=? WHERE id=?",
+                (float(expires_at), int(max_sessions), share_id),
+            )
+            connection.execute(
+                "UPDATE sessions SET expires_at=? WHERE share_id=? AND revoked=0 AND expires_at>?",
+                (float(expires_at), share_id, float(expires_at)),
+            )
+            active = connection.execute(
+                "SELECT id FROM sessions WHERE share_id=? AND revoked=0 AND expires_at>? "
+                "ORDER BY last_seen_at DESC,created_at DESC",
+                (share_id, now),
+            ).fetchall()
+            revoke_ids = [row["id"] for row in active[int(max_sessions):]]
+            if revoke_ids:
+                connection.executemany(
+                    "UPDATE sessions SET revoked=1 WHERE id=?", ((value,) for value in revoke_ids),
+                )
+            connection.commit()
+        return {"share": self.get_share(share_id), "sessions_revoked": len(revoke_ids)}
 
     def authenticate_share(self, raw_token: str, pin: str | None, *, csrf_token: str,
                            device_token: str, lifetime_seconds: int) -> dict:

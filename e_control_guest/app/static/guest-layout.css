@@ -1,4 +1,6 @@
 .guest main { max-width: none; }
+.guest-header-actions { display: flex; gap: 10px; margin-left: auto; }
+.guest-header-actions button { margin-left: 0; }
 .guest-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .guest-toolbar h2 { margin: 0; }
 .guest-grid { grid-template-columns: repeat(auto-fit, minmax(285px, 1fr)); align-items: start; }
@@ -11,4 +13,4 @@
 .climate-detail { display: block; margin-top: 2px; text-align: right; }
 .guest .temperature-control { display: flex; align-items: center; gap: 8px; margin: 0; }
 .guest .temperature-input { width: 96px; min-width: 96px; padding: 8px 10px; text-align: center; font-weight: 800; }
-@media (max-width: 640px) { .guest-grid { grid-template-columns: 1fr; } .guest-toolbar { align-items: stretch; flex-direction: column; } }
+@media (max-width: 640px) { .guest-grid { grid-template-columns: 1fr; } .guest-toolbar { align-items: stretch; flex-direction: column; } .guest-header-actions { width: 100%; } .guest-header-actions button { flex: 1; } }

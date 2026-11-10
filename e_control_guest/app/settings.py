@@ -14,6 +14,7 @@ class Settings:
     session_minutes: int = 30
     polling_seconds: int = 60
     audit_retention_days: int = 365
+    audit_max_events: int = 100_000
     guest_base_url: str = ""
     allow_insecure_local_http: bool = False
     trusted_proxy_cidrs: tuple[str, ...] = ()
@@ -43,6 +44,7 @@ class Settings:
             session_minutes=bounded("session_minutes", 30, 5, 240),
             polling_seconds=bounded("polling_seconds", 60, 15, 3600),
             audit_retention_days=bounded("audit_retention_days", 365, 30, 3650),
+            audit_max_events=bounded("audit_max_events", 100_000, 1000, 1_000_000),
             guest_base_url=str(options.get("guest_base_url", "")).strip().rstrip("/"),
             allow_insecure_local_http=options.get("allow_insecure_local_http") is True,
             trusted_proxy_cidrs=tuple(

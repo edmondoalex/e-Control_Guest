@@ -1,0 +1,27 @@
+{
+  "id": "/guest-access",
+  "name": "e-Control Guest",
+  "short_name": "e-Control Guest",
+  "description": "Accesso ospite controllato e registrato agli ambienti condivisi.",
+  "lang": "it",
+  "start_url": "/guest-access",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#090b0d",
+  "theme_color": "#0d1013",
+  "icons": [
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -93,6 +93,13 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
     async def favicon():
         return FileResponse(STATIC / "icon.png", media_type="image/png")
 
+    @app.get("/service-worker.js", include_in_schema=False)
+    async def service_worker():
+        return FileResponse(
+            STATIC / "service-worker.js", media_type="application/javascript",
+            headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+        )
+
     @app.post("/api/guest/login")
     async def login(
         payload: Login,
