@@ -1,48 +1,35 @@
 # e-Control Guest
 
-Add-on autonomo per condividere dashboard controllate di un impianto senza
-consegnare agli ospiti credenziali o accesso amministrativo.
+Repository Home Assistant per condividere singole schede di una dashboard con
+ospiti, senza consegnare credenziali Home Assistant o accesso amministrativo.
 
-## Confini di sicurezza
+[![Aggiungi il repository a Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fedmondoalex%2Fe-Control_Guest)
 
-- l'amministrazione e disponibile soltanto tramite Ingress;
-- il portale Guest usa una porta e un'applicazione ASGI separate;
-- ogni condivisione espone soltanto card, entita e azioni in allowlist;
-- i token di condivisione sono casuali e nel database viene conservato solo il
-  loro digest autenticato;
-- i PIN sono derivati con Argon2id;
-- le sessioni sono firmate, brevi, revocabili e legate alla revisione della
-  condivisione;
-- ogni richiesta, diniego, comando e readback entra nel registro audit HMAC
-  concatenato;
-- il browser Guest non riceve mai il token Supervisor o credenziali impianto.
+L'amministratore seleziona dashboard, vista e scheda, approva le entità
+leggibili e abilita separatamente ogni azione. Il Guest riceve un link
+revocabile con scadenza, limite di sessioni e PIN opzionale.
 
-## Porte
+Il pacchetto installabile è in [`e_control_guest`](e_control_guest). Le
+istruzioni sono in [`e_control_guest/DOCS.md`](e_control_guest/DOCS.md).
 
-- `8099/tcp`: amministrazione Ingress, non pubblicata;
-- `8100/tcp`: portale Guest, pubblicabile soltanto dietro HTTPS.
+## Sicurezza
 
-## Stato
+- amministrazione esclusivamente tramite Home Assistant Ingress;
+- portale Guest separato sulla porta `8100`, da pubblicare dietro HTTPS;
+- token memorizzati solo come digest HMAC e PIN Argon2id;
+- sessioni firmate, CSRF, cookie dispositivo, rate limit e revoca immediata;
+- allowlist per scheda, entità, azione e intervallo di valore;
+- nessun endpoint Guest generico per chiamare servizi Home Assistant;
+- attributi Home Assistant filtrati prima di raggiungere il browser;
+- audit HMAC concatenato per visite, letture, tentativi, dinieghi, comandi e
+  readback.
 
-Baseline locale completa per CHANGE-2026-058:
-
-- due processi ASGI separati, con amministrazione vincolata a loopback/Ingress;
-- portale Guest con sessioni firmate, cookie dispositivo HttpOnly, CSRF e revoca;
-- broker tipizzato senza endpoint generico verso i servizi Home Assistant;
-- snapshot revisionati di dashboard, viste e card con custom card negate;
-- SQLite locale e audit HMAC concatenato verificabile;
-- rate limit e idempotenza dei comandi;
-- test esclusivamente simulati (`python -m pytest -q`).
-
-Nessuna release, pubblicazione, installazione o prova su impianto reale e stata
-effettuata.
-
-## Sviluppo locale
+## Verifica
 
 ```text
-python -m pip install -r requirements-dev.txt
+python -m pip install -r e_control_guest/requirements-dev.txt
 python -m pytest -q
+python -m compileall -q e_control_guest/app e_control_guest/tests
 ```
 
-L'avvio dell'immagine usa `python -m app`: il processo amministrativo ascolta
-solo su `127.0.0.1:8099`, mentre il portale Guest ascolta sulla porta configurata.
+La CI esegue anche la build completa dell'immagine `linux/amd64`.

@@ -1,48 +1,74 @@
-# e-Control Guest
+# e-Control Guest — guida
 
-Add-on autonomo per condividere dashboard controllate di un impianto senza
-consegnare agli ospiti credenziali o accesso amministrativo.
+## Prima configurazione
 
-## Confini di sicurezza
+1. Installa e avvia l'add-on.
+2. Nella configurazione imposta `guest_base_url` con l'indirizzo HTTPS pubblico
+   del portale Guest, senza slash finale, per esempio
+   `https://guest.example.it`.
+3. Pubblica la porta Guest `8100/tcp` attraverso un reverse proxy HTTPS. La
+   porta amministrativa `8099` è riservata a Ingress e non va pubblicata.
+4. In **Apri interfaccia Web** crea un profilo Guest.
+5. Scegli la dashboard e carica le schede. Se la lettura automatica non è
+   disponibile sulla versione Home Assistant installata, espandi il fallback
+   JSON e incolla la configurazione Lovelace.
+6. Importa una scheda. L'add-on ne crea uno snapshot: le modifiche future alla
+   dashboard sorgente non entrano automaticamente nella condivisione.
+7. Abilita singolarmente lettura e azioni, quindi salva i permessi.
+8. Crea il link indicando PIN, validità e numero massimo di sessioni. Il token
+   completo viene mostrato una volta sola.
 
-- l'amministrazione e disponibile soltanto tramite Ingress;
-- il portale Guest usa una porta e un'applicazione ASGI separate;
-- ogni condivisione espone soltanto card, entita e azioni in allowlist;
-- i token di condivisione sono casuali e nel database viene conservato solo il
-  loro digest autenticato;
-- i PIN sono derivati con Argon2id;
-- le sessioni sono firmate, brevi, revocabili e legate alla revisione della
-  condivisione;
-- ogni richiesta, diniego, comando e readback entra nel registro audit HMAC
-  concatenato;
-- il browser Guest non riceve mai il token Supervisor o credenziali impianto.
+Ogni modifica a schede o permessi incrementa la revisione del profilo e rende
+inutilizzabili i link creati sulla revisione precedente. Crea un nuovo link dopo
+aver verificato la configurazione.
 
-## Porte
+## Schede e comandi supportati
 
-- `8099/tcp`: amministrazione Ingress, non pubblicata;
-- `8100/tcp`: portale Guest, pubblicabile soltanto dietro HTTPS.
+Sono importabili le schede integrate `entities`, `entity`, `tile`, `thermostat`,
+`button`, `gauge` e `sensor`. I contenitori `grid`, `vertical-stack` e
+`horizontal-stack` vengono attraversati per estrarre le schede figlie. Le
+`custom:*` non vengono eseguite nel portale Guest.
 
-## Stato
+Azioni disponibili, sempre disabilitate all'importazione:
 
-Baseline locale completa per CHANGE-2026-058:
+- luci: accensione, spegnimento, luminosità con intervallo;
+- switch: accensione e spegnimento;
+- clima: temperatura con intervallo e modalità HVAC in elenco chiuso;
+- cover: apertura, chiusura, stop e posizione con intervallo;
+- pulsanti: pressione.
 
-- due processi ASGI separati, con amministrazione vincolata a loopback/Ingress;
-- portale Guest con sessioni firmate, cookie dispositivo HttpOnly, CSRF e revoca;
-- broker tipizzato senza endpoint generico verso i servizi Home Assistant;
-- snapshot revisionati di dashboard, viste e card con custom card negate;
-- SQLite locale e audit HMAC concatenato verificabile;
-- rate limit e idempotenza dei comandi;
-- test esclusivamente simulati (`python -m pytest -q`).
+Il portale chiama un broker tipizzato. Non esiste un'API Guest che accetti un
+dominio o un servizio Home Assistant arbitrario.
 
-Nessuna release, pubblicazione, installazione o prova su impianto reale e stata
-effettuata.
+## Opzioni
 
-## Sviluppo locale
+- `guest_port`: porta del portale Guest, predefinita `8100`;
+- `guest_base_url`: URL HTTPS usato per generare i link;
+- `session_minutes`: durata massima della sessione, da 5 a 240 minuti;
+- `audit_retention_days`: riserva per la politica di conservazione; la RC non
+  elimina automaticamente eventi;
+- `trusted_proxy_cidrs`: proxy autorizzati a fornire `X-Forwarded-For`. Se il
+  peer non appartiene a queste reti, l'header viene ignorato.
 
-```text
-python -m pip install -r requirements-dev.txt
-python -m pytest -q
-```
+## Registro e revoca
 
-L'avvio dell'immagine usa `python -m app`: il processo amministrativo ascolta
-solo su `127.0.0.1:8099`, mentre il portale Guest ascolta sulla porta configurata.
+Il pannello mostra gli eventi con esito. Il database conserva visite, letture,
+login riusciti o negati, controlli sessione, comandi richiesti e stato letto
+dopo il comando. PIN, cookie e token sono rimossi dai metadati di audit. La
+verifica della catena segnala modifiche retroattive al registro.
+
+Revocando un link vengono revocate anche tutte le sue sessioni. Disattivando un
+profilo o cambiandone schede e permessi, le sessioni della revisione precedente
+non superano più la validazione.
+
+## HTTPS
+
+In produzione i cookie Guest hanno il flag `Secure`. Un accesso diretto via
+`http://IP:8100` non crea quindi una sessione utilizzabile. Configura un reverse
+proxy HTTPS e inserisci il suo URL in `guest_base_url`.
+
+## Backup
+
+Database e chiavi risiedono in `/data` e rientrano nel backup dell'add-on. Le
+chiavi sono necessarie per verificare la catena audit e le sessioni già emesse.
+Non copiare singolarmente i database senza la directory `secrets` associata.
