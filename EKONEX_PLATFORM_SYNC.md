@@ -1,3 +1,16 @@
+## Handoff corrente - RC32 candidata locale, gestione sessioni attive (10/11/2026)
+
+Preparata localmente RC32. L'elenco link mostra le sessioni attive rispetto al
+limite e consente all'amministratore di chiuderle senza revocare o modificare
+il link. Questo risolve il caso in cui una scheda chiusa sul cellulare lasci lo
+slot occupato fino alla scadenza. Il rientro dallo stesso browser recupera
+inoltre il proprio slot tramite la sessione firmata anche se il cookie
+dispositivo non e piu disponibile; non puo sostituire sessioni di altri
+dispositivi. Tutte le chiusure amministrative sono registrate in audit.
+
+26 test, compileall, sintassi JavaScript e diff-check locali PASS. Versione
+`0.1.0-rc32`; nessun commit, push, tag, release o installazione eseguiti.
+
 ## Handoff corrente - RC31 PWA, gestione link, JSON e audit limitato (10/11/2026)
 
 Pubblicata e qualificata RC31. La sezione contenuti e permessi parte chiusa;

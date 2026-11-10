@@ -236,6 +236,37 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
     assert guest.get("/api/guest/dashboard").status_code == 401
 
 
+def test_admin_can_close_active_sessions_without_revoking_share(runtime):
+    admin = TestClient(create_admin_app(runtime))
+    headers = {"x-hass-user-id": "admin-1"}
+    csrf = admin.get("/api/admin/bootstrap", headers=headers).json()["csrf"]
+    write = {**headers, "X-eControl-CSRF": csrf}
+    profile = admin.post("/api/admin/profiles", headers=write, json={"name": "Sessioni"}).json()
+    created = admin.post(
+        f"/api/admin/profiles/{profile['id']}/shares", headers=write,
+        json={"label": "Telefono", "pin": "1234", "valid_minutes": 60,
+              "max_sessions": 1},
+    ).json()
+    token = created["fragment_url"].split("#token=", 1)[1]
+    guest = TestClient(create_guest_app(runtime))
+    assert guest.post("/api/guest/login", json={"token": token, "pin": "1234"}).status_code == 200
+    listed = admin.get(f"/api/admin/profiles/{profile['id']}", headers=headers).json()["shares"]
+    assert listed[0]["active_sessions"] == 1
+
+    closed = admin.post(
+        f"/api/admin/shares/{created['share']['id']}/sessions/revoke", headers=write,
+        json={},
+    )
+    assert closed.status_code == 200
+    assert closed.json()["sessions_revoked"] == 1
+    assert runtime.store.get_share(created["share"]["id"])["enabled"] == 1
+    assert guest.get("/api/guest/dashboard").status_code == 401
+    with TestClient(create_guest_app(runtime)) as replacement:
+        assert replacement.post(
+            "/api/guest/login", json={"token": token, "pin": "1234"}
+        ).status_code == 200
+
+
 def test_guest_entry_uses_dedicated_non_share_path(runtime):
     guest = TestClient(create_guest_app(runtime))
     page = guest.get("/guest-access")

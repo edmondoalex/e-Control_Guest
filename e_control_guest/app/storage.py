@@ -331,17 +331,33 @@ class GuestStore:
     def list_shares(self, profile_id: str | None = None) -> list[dict]:
         query = (
             "SELECT s.id,s.profile_id,s.enabled,s.label,s.expires_at,s.max_sessions,s.profile_revision,s.created_at,"
-            "s.revoked_reason,s.revoked_by,s.revoked_at,1 AS revision_valid "
+            "s.revoked_reason,s.revoked_by,s.revoked_at,1 AS revision_valid,"
+            "(SELECT COUNT(*) FROM sessions x WHERE x.share_id=s.id AND x.revoked=0 "
+            "AND x.expires_at>?) AS active_sessions "
             "FROM shares s JOIN profiles p ON p.id=s.profile_id"
         )
-        args: tuple = ()
+        args: tuple = (_now(),)
         if profile_id:
             query += " WHERE s.profile_id=?"
-            args = (profile_id,)
+            args += (profile_id,)
         query += " ORDER BY s.created_at DESC"
         with self._connect() as connection:
             rows = connection.execute(query, args).fetchall()
         return [dict(row) for row in rows]
+
+    def revoke_share_sessions(self, share_id: str) -> int:
+        now = _now()
+        with self._lock, self._connect() as connection:
+            exists = connection.execute(
+                "SELECT 1 FROM shares WHERE id=?", (share_id,),
+            ).fetchone()
+            if exists is None:
+                raise KeyError(share_id)
+            cursor = connection.execute(
+                "UPDATE sessions SET revoked=1 WHERE share_id=? AND revoked=0 AND expires_at>?",
+                (share_id, now),
+            )
+        return max(0, int(cursor.rowcount))
 
     def update_share_limits(self, share_id: str, *, expires_at: float,
                             max_sessions: int) -> dict:
@@ -383,7 +399,8 @@ class GuestStore:
         return {"share": self.get_share(share_id), "sessions_revoked": len(revoke_ids)}
 
     def authenticate_share(self, raw_token: str, pin: str | None, *, csrf_token: str,
-                           device_token: str, lifetime_seconds: int) -> dict:
+                           device_token: str, lifetime_seconds: int,
+                           replace_session_id: str | None = None) -> dict:
         digest, now = token_digest(self.token_key, raw_token), _now()
         with self._lock, self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -399,6 +416,12 @@ class GuestStore:
             if not verify_pin(share["pin_hash"], pin):
                 raise StoreError("invalid_pin")
             device_digest = token_digest(self.token_key, device_token)
+            if replace_session_id:
+                connection.execute(
+                    "UPDATE sessions SET revoked=1 "
+                    "WHERE id=? AND share_id=? AND revoked=0",
+                    (replace_session_id, share["id"]),
+                )
             connection.execute(
                 "UPDATE sessions SET revoked=1 "
                 "WHERE share_id=? AND device_digest=? AND revoked=0",

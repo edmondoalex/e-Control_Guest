@@ -239,6 +239,26 @@ def test_same_browser_replaces_its_session_without_consuming_another_slot(tmp_pa
             assert denied.json()["detail"].startswith("Limite di sessioni simultanee")
 
 
+def test_same_browser_signed_session_recovers_slot_when_device_cookie_is_missing(tmp_path):
+    runtime, _ = make_runtime(tmp_path)
+    _, token, _ = provision(runtime, max_sessions=1)
+    app = create_guest_app(runtime)
+    with TestClient(app, base_url="http://guest.test") as same_browser:
+        first = same_browser.post(
+            "/api/guest/login", json={"token": token, "pin": "1234"}
+        )
+        assert first.status_code == 200
+        signed_session = same_browser.cookies.get("ecg_session")
+        same_browser.cookies.delete("ecg_device")
+
+        recovered = same_browser.post(
+            "/api/guest/login", json={"token": token, "pin": "1234"}
+        )
+
+        assert recovered.status_code == 200
+        assert same_browser.cookies.get("ecg_session") != signed_session
+
+
 def test_updating_share_limits_revokes_excess_sessions_immediately(tmp_path):
     runtime = build_runtime(
         Settings(data_dir=tmp_path, development_admin=True, session_minutes=30,

@@ -419,6 +419,22 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
                              metadata={"label": share.get("label", ""), "reason": payload.reason})
         return {"revoked": True}
 
+    @app.post("/api/admin/shares/{share_id}/sessions/revoke",
+              dependencies=[Depends(require_csrf)])
+    async def revoke_share_sessions(share_id: str, request: Request):
+        actor_id = request.headers.get("x-hass-user-id", "ingress")
+        try:
+            share = runtime.store.get_share(share_id)
+            count = runtime.store.revoke_share_sessions(share_id)
+        except KeyError as exc:
+            raise HTTPException(404, "Link non trovato") from exc
+        runtime.audit.append(
+            actor_type="admin", actor_id=actor_id, action="share_sessions_revoke",
+            resource=share_id, outcome="allowed",
+            metadata={"label": share.get("label", ""), "sessions_revoked": count},
+        )
+        return {"sessions_revoked": count}
+
     @app.get("/api/admin/shares/{share_id}/link", dependencies=[Depends(require_ingress)])
     async def share_link(share_id: str):
         try:

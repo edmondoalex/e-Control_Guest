@@ -106,6 +106,7 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
         request: Request,
         response: Response,
         ecg_device: str | None = Cookie(default=None),
+        ecg_session: str | None = Cookie(default=None),
     ):
         network_id = runtime.network_id(request)
         try:
@@ -115,10 +116,18 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
             raise HTTPException(429, "Troppi tentativi. Riprova piu tardi") from exc
         csrf_token = b64url(secrets.token_bytes(32))
         device_token = ecg_device or b64url(secrets.token_bytes(32))
+        replace_session_id = None
+        if ecg_session:
+            try:
+                replace_session_id = str(runtime.signer.verify(ecg_session)["sid"])
+            except (KeyError, TypeError, ValueError):
+                # An expired or invalid browser cookie must not block a fresh login.
+                pass
         try:
             row = runtime.store.authenticate_share(
                 payload.token, payload.pin, csrf_token=csrf_token, device_token=device_token,
                 lifetime_seconds=runtime.settings.session_minutes * 60,
+                replace_session_id=replace_session_id,
             )
         except StoreError as exc:
             reason = str(exc)
