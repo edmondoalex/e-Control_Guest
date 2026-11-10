@@ -49,7 +49,8 @@ SAFE_ATTRIBUTES = {
     "light": {"friendly_name", "icon", "brightness", "color_temp_kelvin", "supported_color_modes"},
     "switch": {"friendly_name", "icon", "device_class"},
     "climate": {"friendly_name", "icon", "temperature", "current_temperature", "hvac_action",
-                "hvac_modes", "min_temp", "max_temp", "target_temp_step", "unit_of_measurement"},
+                "hvac_modes", "min_temp", "max_temp", "target_temp_step", "temperature_unit",
+                "unit_of_measurement"},
     "cover": {"friendly_name", "icon", "device_class", "current_position"},
     "button": {"friendly_name", "icon", "device_class"},
 }

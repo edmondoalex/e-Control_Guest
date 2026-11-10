@@ -45,6 +45,7 @@ def runtime(tmp_path: Path):
 
 def dashboard_config() -> dict:
     return {"views": [{"title": "Interrato", "cards": [
+        {"type": "heading", "heading": "INTERRATO"},
         {"type": "entities", "title": "TASTING ROOM",
          "entities": [{"entity": "light.tasting", "name": "Tasting Room"}]},
         {"type": "custom:unsafe-card", "entity": "switch.secret"},
@@ -54,9 +55,12 @@ def dashboard_config() -> dict:
 def test_importer_flattens_only_safe_builtin_cards():
     cards = inspect_dashboard(dashboard_config())
     assert cards[0].safe is True
-    assert cards[0].entities[0]["entity_id"] == "light.tasting"
-    assert cards[1].safe is False
-    assert cards[1].reason == "custom_card_not_executable"
+    assert cards[0].card_type == "heading"
+    assert cards[0].title == "INTERRATO"
+    assert cards[0].entities == []
+    assert cards[1].entities[0]["entity_id"] == "light.tasting"
+    assert cards[2].safe is False
+    assert cards[2].reason == "custom_card_not_executable"
 
 
 def test_generated_dashboard_returns_readable_error():
@@ -106,7 +110,7 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
     profile = admin.post("/api/admin/profiles", headers=write, json={"name": "Ospiti"}).json()
     inspected = admin.post("/api/admin/import/inspect", headers=write,
                            json={"dashboard": "manual", "config": dashboard_config()}).json()
-    safe = next(item for item in inspected["cards"] if item["safe"])
+    safe = next(item for item in inspected["cards"] if item["card_type"] == "entities")
     card = admin.post(f"/api/admin/profiles/{profile['id']}/cards/import", headers=write,
                       json={"dashboard": "manual", "source_ref": safe["source_ref"],
                             "config": dashboard_config()}).json()

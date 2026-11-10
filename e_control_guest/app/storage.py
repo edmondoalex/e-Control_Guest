@@ -111,11 +111,11 @@ class GuestStore:
         return self.get_profile(profile_id)
 
     def add_card(self, profile_id: str, snapshot: dict) -> dict:
-        required = {"source_ref", "source_hash", "title", "type", "entities", "permissions"}
+        required = {"source_ref", "source_hash", "title", "type", "appearance", "entities", "permissions"}
         if not isinstance(snapshot, dict) or set(snapshot) != required:
             raise ValueError("Snapshot card non valido")
         card_id, now = str(uuid.uuid4()), _now()
-        config = {key: snapshot[key] for key in ("type", "entities")}
+        config = {key: snapshot[key] for key in ("type", "appearance", "entities")}
         with self._lock, self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             profile = connection.execute("SELECT * FROM profiles WHERE id=?", (profile_id,)).fetchone()

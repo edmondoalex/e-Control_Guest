@@ -75,6 +75,15 @@ def test_importer_rejects_custom_card_and_freezes_safe_snapshot():
     assert frozen["permissions"]["light.good"]["actions"] == []
 
 
+def test_heading_snapshot_is_display_only_and_preserves_title():
+    config = {"views": [{"cards": [{"type": "heading", "heading": "INTERRATO"}]}]}
+    frozen = snapshot(inspect_dashboard(config)[0])
+    assert frozen["title"] == "INTERRATO"
+    assert frozen["type"] == "heading"
+    assert frozen["entities"] == []
+    assert frozen["permissions"] == {}
+
+
 def test_policy_is_fail_closed_and_enforces_ranges():
     permissions = {"light.sala": {"actions": ["set_brightness"],
                                    "limits": {"brightness": [10, 100]}}}

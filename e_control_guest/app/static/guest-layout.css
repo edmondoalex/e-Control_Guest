@@ -1,0 +1,10 @@
+.guest main { max-width: none; }
+.guest-grid { grid-template-columns: repeat(auto-fit, minmax(285px, 1fr)); align-items: start; }
+.guest-card { border-radius: 10px; }
+.guest-card[data-type="heading"] { grid-column: 1 / -1; background: transparent; border: 0; box-shadow: none; }
+.guest-card[data-type="heading"] h3 { padding: 8px 2px; border: 0; text-transform: uppercase; }
+.guest-card h3 { padding: 12px; }
+.guest-row { padding: 10px 12px; }
+.guest-row .state { float: right; }
+.climate-detail { display: block; margin-top: 2px; text-align: right; }
+@media (max-width: 640px) { .guest-grid { grid-template-columns: 1fr; } }

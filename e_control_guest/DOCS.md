@@ -16,8 +16,9 @@ Supervisor.
 5. Scegli la dashboard e carica le schede. Se la lettura automatica non è
    disponibile sulla versione Home Assistant installata, espandi il fallback
    JSON e incolla la configurazione Lovelace.
-6. Importa una scheda. L'add-on ne crea uno snapshot: le modifiche future alla
-   dashboard sorgente non entrano automaticamente nella condivisione.
+6. Importa una singola scheda oppure usa **Importa l'intera vista in ordine**.
+   L'add-on crea snapshot sicuri: le modifiche future alla dashboard sorgente
+   non entrano automaticamente nella condivisione.
 7. Abilita singolarmente lettura e azioni, quindi salva i permessi.
 8. Crea il link indicando PIN, validità e numero massimo di sessioni. Il token
    completo viene mostrato una volta sola.
@@ -33,9 +34,15 @@ aver verificato la configurazione.
 ## Schede e comandi supportati
 
 Sono importabili le schede integrate `entities`, `entity`, `tile`, `thermostat`,
-`button`, `gauge` e `sensor`. I contenitori `grid`, `vertical-stack` e
+`button`, `gauge`, `sensor` e le intestazioni `heading`. Ordine e intestazioni
+della vista vengono conservati; il portale usa una griglia densa e responsive.
+I contenitori `grid`, `vertical-stack` e
 `horizontal-stack` vengono attraversati per estrarre le schede figlie. Le
 `custom:*` non vengono eseguite nel portale Guest.
+
+Le entita `climate` mostrano stato, temperatura attuale e setpoint. La lettura
+non abilita automaticamente i comandi: modifica del setpoint e modalita HVAC
+restano permessi separati, disabilitati fino all'approvazione esplicita.
 
 Azioni disponibili, sempre disabilitate all'importazione:
 

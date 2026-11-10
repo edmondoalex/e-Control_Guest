@@ -133,6 +133,10 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
             raise HTTPException(404, "Profilo non disponibile") from exc
         output = []
         for card in value["cards"]:
+            if card["config"]["type"] == "heading":
+                output.append({"id": card["id"], "title": card["title"], "type": "heading",
+                               "appearance": card["config"].get("appearance", {}), "states": []})
+                continue
             states = []
             for entity in card["config"]["entities"]:
                 entity_id = entity["entity_id"]
@@ -157,7 +161,8 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
                     outcome=outcome,
                 )
             output.append({"id": card["id"], "title": card["title"],
-                           "type": card["config"]["type"], "states": states})
+                           "type": card["config"]["type"],
+                           "appearance": card["config"].get("appearance", {}), "states": states})
         runtime.audit.append(
             actor_type="guest", actor_id=runtime.user_agent_id(request),
             session_id=current["sid"], action="dashboard_view", resource=current["pr"],

@@ -8,7 +8,7 @@ from typing import Any, Iterator
 from .policy import suggested_actions
 
 
-SAFE_CARD_TYPES = {"entities", "entity", "tile", "thermostat", "button", "gauge", "sensor"}
+SAFE_CARD_TYPES = {"entities", "entity", "tile", "thermostat", "button", "gauge", "sensor", "heading"}
 CONTAINER_CARD_TYPES = {"vertical-stack", "horizontal-stack", "grid"}
 
 
@@ -106,7 +106,7 @@ def inspect_dashboard(config: dict, dashboard: str = "lovelace") -> list[CardCan
                     source_ref=source_ref,
                     dashboard=dashboard,
                     view_title=view_title,
-                    title=str(card.get("title") or card.get("name") or view_title)[:100],
+                    title=str(card.get("title") or card.get("heading") or card.get("name") or view_title)[:100],
                     card_type=card_type,
                     safe=safe,
                     reason=reason,
@@ -125,6 +125,10 @@ def snapshot(candidate: CardCandidate) -> dict:
         "source_hash": candidate.source_hash,
         "title": candidate.title,
         "type": candidate.card_type,
+        "appearance": {
+            "heading_level": int(candidate.config.get("heading_style") == "title") + 2,
+            "icon": str(candidate.config.get("icon") or "")[:100],
+        },
         "entities": [
             {"entity_id": item["entity_id"], "name": item["name"], "icon": item["icon"]}
             for item in candidate.entities
