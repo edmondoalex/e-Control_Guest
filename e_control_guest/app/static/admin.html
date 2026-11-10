@@ -1,12 +1,12 @@
 <!doctype html>
 <html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>e-Control Guest</title><link rel="stylesheet" href="static/app.css"></head>
+<title>e-Control Guest</title><link rel="stylesheet" href="static/app.css"><link rel="stylesheet" href="static/admin-layout.css"></head>
 <body><header><img src="static/icon.png" alt=""><div><small>AMMINISTRAZIONE</small><h1>e-Control Guest</h1><p>Condividi solo ciò che scegli, con azioni e scadenza controllate.</p></div><span id="health" class="badge">Avvio…</span></header>
 <main>
   <section><h2>1. Profilo Guest</h2><div class="row"><input id="profile-name" maxlength="100" placeholder="Es. Ospiti Tasting Room"><button id="create-profile">Crea profilo</button></div><div id="profiles" class="chips"></div></section>
   <section><h2>2. Seleziona una scheda Home Assistant</h2><p id="import-mode" class="muted"></p><div class="row"><select id="dashboards"></select><button id="load-cards">Carica schede</button></div>
     <details><summary>Importazione manuale JSON per Home Assistant legacy</summary><textarea id="manual-json" rows="9" spellcheck="false" placeholder='{"views":[{"title":"...","cards":[...]}]}'></textarea><button id="inspect-json">Analizza JSON</button></details><div class="row"><button id="import-all" class="secondary hidden">Importa l'intera vista in ordine</button><span id="import-progress" class="muted"></span></div><div id="candidates" class="grid"></div></section>
-  <section><h2>3. Contenuto e permessi</h2><p class="muted">La lettura è separata dai comandi. Ogni azione va abilitata esplicitamente.</p><div id="cards"></div></section>
+  <section><h2>3. Contenuto e permessi</h2><p class="muted">La lettura è separata dai comandi. Ogni azione va abilitata esplicitamente.</p><div class="permission-tools"><input id="card-filter" type="search" placeholder="Cerca stanza o dispositivo"><button id="collapse-cards" class="secondary">Chiudi tutte</button><button id="expand-cards" class="secondary">Apri tutte</button></div><div id="cards"></div></section>
   <section><h2>4. Crea il link</h2><div class="form-grid"><label>PIN (4–12 cifre)<input id="share-pin" inputmode="numeric" maxlength="12"></label><label>Validità minuti<input id="share-minutes" type="number" min="5" value="60"></label><label>Sessioni simultanee<input id="share-sessions" type="number" min="1" max="20" value="1"></label></div><button id="create-share">Crea link Guest</button><div id="new-link"></div><div id="shares"></div></section>
   <section><h2>Registro completo</h2><div class="row"><button id="refresh-audit">Aggiorna</button><span id="audit-state" class="muted"></span></div><div class="table-wrap"><table><thead><tr><th>Quando</th><th>Azione</th><th>Risorsa</th><th>Esito</th></tr></thead><tbody id="audit"></tbody></table></div></section>
 </main><div id="toast" role="status"></div><script src="static/admin.js"></script></body></html>
