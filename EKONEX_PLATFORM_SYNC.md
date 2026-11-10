@@ -1,4 +1,17 @@
-## Handoff corrente - RC11 layout vista e termostati (10/11/2026)
+## Handoff corrente - RC12 permessi gestibili su profili grandi (10/11/2026)
+
+RC12 corregge l'elenco permessi troppo esteso: ogni scheda e richiusa per
+impostazione predefinita e mostra soltanto titolo e conteggio dispositivi.
+Aggiunti ricerca per stanza/entita, apertura e chiusura globale e comando
+rapido per impostare una scheda in sola lettura prima del salvataggio. Profili,
+snapshot e configurazioni RC11 restano compatibili.
+
+Commit `05d108d`, tag/release `v0.1.0-rc12`. Qualifica locale: 15 test,
+compileall e sintassi JavaScript PASS. GitHub Actions tag `42851349210`: test,
+metadati e build `amd64`, `aarch64`, `armv7`, `armhf`, `i386` PASS.
+Aggiornamento e verifica UI sul Green restano al proprietario.
+
+## Handoff precedente - RC11 layout vista e termostati (10/11/2026)
 
 RC11 aggiunge l'importazione in blocco dell'intera vista mantenendo ordine e
 intestazioni `heading`, e rende il portale Guest una griglia densa responsive.
