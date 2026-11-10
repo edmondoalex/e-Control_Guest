@@ -1,4 +1,18 @@
-## Handoff corrente - RC12 permessi gestibili su profili grandi (10/11/2026)
+## Handoff corrente - RC16 link nominativi e audit leggibile (10/11/2026)
+
+RC13 sostituisce il cursore del setpoint con una casella numerica; RC14 aggiunge
+link senza scadenza, protetti da PIN e validi fino alla revoca. RC15 introduce
+nome ospite/descrizione del link, motivazione obbligatoria, autore e data della
+revoca. RC16 rende leggibile il registro Guest con nome link, dispositivo,
+comando, valore richiesto, stato finale ed esito, senza registrare token o PIN.
+
+Commit RC16 `38fe7b0`, tag/release `v0.1.0-rc16`. Qualifica locale: 15 test,
+compileall e sintassi JavaScript PASS. GitHub Actions tag `42854861289`: test,
+metadati e build `amd64`, `aarch64`, `armv7`, `armhf`, `i386` PASS. Le vecchie
+revoche non possono acquisire retroattivamente un nome; vengono indicate come
+link precedenti. Aggiornamento e collaudo UI sul Green restano al proprietario.
+
+## Handoff precedente - RC12 permessi gestibili su profili grandi (10/11/2026)
 
 RC12 corregge l'elenco permessi troppo esteso: ogni scheda e richiusa per
 impostazione predefinita e mostra soltanto titolo e conteggio dispositivi.
