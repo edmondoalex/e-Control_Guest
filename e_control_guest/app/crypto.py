@@ -56,6 +56,11 @@ def new_share_token() -> str:
     return b64url(secrets.token_bytes(32))
 
 
+def recoverable_share_token(key: bytes, share_id: str) -> str:
+    """Derive an unguessable token that can be reconstructed only with the local secret."""
+    return b64url(hmac.new(key, f"share-token-v1:{share_id}".encode("utf-8"), hashlib.sha256).digest())
+
+
 def token_digest(key: bytes, token: str) -> str:
     return hmac.new(key, token.encode("utf-8"), hashlib.sha256).hexdigest()
 

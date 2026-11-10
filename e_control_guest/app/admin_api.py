@@ -308,6 +308,18 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
                              metadata={"label": share.get("label", ""), "reason": payload.reason})
         return {"revoked": True}
 
+    @app.get("/api/admin/shares/{share_id}/link", dependencies=[Depends(require_ingress)])
+    async def share_link(share_id: str):
+        try:
+            share = runtime.store.get_share(share_id)
+            token = runtime.store.recover_share_token(share_id)
+        except KeyError as exc:
+            raise HTTPException(404, "Link non trovato") from exc
+        except StoreError as exc:
+            raise HTTPException(409, "Questo link precedente non e recuperabile") from exc
+        return {"share_id": share_id, "label": share.get("label", ""),
+                "fragment_url": f"{runtime.settings.guest_base_url}/guest-access#token={token}"}
+
     @app.get("/api/admin/audit", dependencies=[Depends(require_ingress)])
     async def audit(limit: int = 200):
         valid, broken_at = runtime.audit.verify()

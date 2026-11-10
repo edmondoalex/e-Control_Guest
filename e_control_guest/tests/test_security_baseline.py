@@ -180,6 +180,13 @@ def test_token_and_pin_are_not_persisted_or_logged(tmp_path):
     assert b"6789" not in database_bytes + audit_bytes
 
 
+def test_new_share_token_can_be_recovered_without_plaintext_storage(tmp_path):
+    runtime, _ = make_runtime(tmp_path)
+    share, token, _ = provision(runtime)
+    assert runtime.store.recover_share_token(share["id"]) == token
+    assert token.encode() not in (tmp_path / "guest.db").read_bytes()
+
+
 def test_audit_chain_detects_tampering(tmp_path):
     database = tmp_path / "audit.db"
     audit = AuditLog(database, b"k" * 32)

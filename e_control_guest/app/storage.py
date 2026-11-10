@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import json
 import sqlite3
 import threading
@@ -7,7 +8,7 @@ import time
 import uuid
 from pathlib import Path
 
-from .crypto import hash_pin, new_share_token, token_digest, verify_pin
+from .crypto import hash_pin, recoverable_share_token, token_digest, verify_pin
 
 
 def _now() -> float:
@@ -247,8 +248,8 @@ class GuestStore:
         label = label.strip()
         if not 1 <= len(label) <= 100:
             raise ValueError("Nome ospite o descrizione non validi")
-        raw_token = new_share_token()
         share_id, now = str(uuid.uuid4()), _now()
+        raw_token = recoverable_share_token(self.token_key, share_id)
         with self._connect() as connection:
             connection.execute(
                 "INSERT INTO shares (id,profile_id,token_digest,pin_hash,enabled,label,expires_at,max_sessions,profile_revision,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
@@ -256,6 +257,18 @@ class GuestStore:
                  1, label, float(expires_at), int(max_sessions), int(profile["revision"]), now),
             )
         return self.get_share(share_id), raw_token
+
+    def recover_share_token(self, share_id: str) -> str:
+        candidate = recoverable_share_token(self.token_key, share_id)
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT token_digest FROM shares WHERE id=?", (share_id,)
+            ).fetchone()
+        if row is None:
+            raise KeyError(share_id)
+        if not hmac.compare_digest(str(row["token_digest"]), token_digest(self.token_key, candidate)):
+            raise StoreError("legacy_token_unrecoverable")
+        return candidate
 
     def token_fingerprint(self, raw_token: str) -> str:
         """Stable keyed identifier for throttling; never returns the token or its raw hash."""
