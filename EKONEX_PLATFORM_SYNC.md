@@ -1,3 +1,16 @@
+## Handoff corrente - RC27 recupero link legacy (10/11/2026)
+
+Pubblicata e qualificata RC27. Corretto HTTP 500 dei pulsanti `Mostra link` e
+`Copia link`: una condivisione attiva creata prima di RC23 riceve al primo
+recupero un alias deterministico autenticato, mentre il link originale resta
+valido. Entrambi cessano di funzionare soltanto a scadenza o revoca. I pulsanti
+di recupero sono disabilitati per condivisioni scadute o revocate.
+
+Commit `8caf9da`, tag/release `v0.1.0-rc27`; 20 test, compileall, sintassi
+JavaScript e diff-check locali PASS. GitHub Actions tag `42876349300`: test,
+metadati e build `amd64`, `aarch64`, `armv7`, `armhf`, `i386` PASS.
+Installazione e verifica sul Green restano al proprietario.
+
 ## Handoff corrente - RC26 pubblicata, branding Ekonex e splash (10/11/2026)
 
 Pubblicata e qualificata RC26. Il portale Guest mostra il marchio Ekonex a
