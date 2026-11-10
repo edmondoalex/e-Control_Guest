@@ -1,6 +1,6 @@
-## Handoff corrente - RC17 locale, permessi cumulativi e identita Guest (10/11/2026)
+## Handoff corrente - RC17 pubblicata, permessi cumulativi e identita Guest (10/11/2026)
 
-Preparata localmente RC17. La pagina amministrativa offre `Salva tutti i
+Pubblicata RC17. La pagina amministrativa offre `Salva tutti i
 permessi`, con validazione e aggiornamento atomico dell'intero profilo e una
 sola revisione; il salvataggio della singola scheda resta disponibile. Il
 pulsante `Rimuovi` e ora visibile anche sulla scheda chiusa e richiede conferma.
@@ -11,9 +11,10 @@ lettura gli eventi precedenti collegando sessione e link, senza alterare la
 catena HMAC. Link storici privi di etichetta non possono acquisire
 retroattivamente un'identita. Nessun token o PIN e registrato.
 
-Qualifica locale: 15 test, compileall, sintassi JavaScript e diff-check PASS.
-Versione pacchetto predisposta `0.1.0-rc17`. Commit/push/tag/release non ancora
-eseguiti; installazione e collaudo Green restano al proprietario.
+Commit `6e0305d`, tag/release `v0.1.0-rc17`. Qualifica locale: 15 test,
+compileall, sintassi JavaScript e diff-check PASS. GitHub Actions tag
+`42859931572`: test, metadati e build `amd64`, `aarch64`, `armv7`, `armhf` e
+`i386` PASS. Installazione e collaudo Green restano al proprietario.
 
 ## Handoff corrente - RC16 link nominativi e audit leggibile (10/11/2026)
 
