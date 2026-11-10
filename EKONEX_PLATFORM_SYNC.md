@@ -165,3 +165,17 @@ compileall, sintassi JavaScript admin/guest e diff-check PASS. GitHub Actions
 tag `42866370485`: test, metadati e build `amd64`, `aarch64`, `armv7`, `armhf`
 e `i386` PASS. Nessun accesso a impianti o installazione eseguito;
 aggiornamento e collaudo restano al proprietario.
+## Handoff corrente - RC22 pubblicata, dashboard Guest ottimizzata (10/11/2026)
+
+Pubblicata e qualificata RC22. Il caricamento Guest usa una sola richiesta bulk
+degli stati Home Assistant invece di una richiesta per entita; ogni refresh
+scrive un solo evento audit di visualizzazione, mentre i comandi restano
+registrati singolarmente con dispositivo, valore ed esito. Rimossi i refresh
+sovrapposti. Aggiunti pulsante `Aggiorna` e opzione add-on
+`polling_seconds`, configurabile da 15 a 3600 secondi con default 60. RC20 aveva
+inoltre aggiunto favicon e Apple Touch icon alle due superfici.
+
+Commit RC22 `c67bddb`, tag/release `v0.1.0-rc22`; 17 test, compileall,
+sintassi JavaScript e diff-check locali PASS. GitHub Actions tag `42868920169`:
+test, metadati e build `amd64`, `aarch64`, `armv7`, `armhf`, `i386` PASS.
+Installazione e verifica del recupero CPU/assenza 524 restano al proprietario.
