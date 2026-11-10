@@ -86,7 +86,7 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
                 "broken_at": broken_at}
 
     @app.get("/")
-    @app.get("/share")
+    @app.get("/guest-access")
     async def share_page():
         return FileResponse(STATIC / "guest.html")
 

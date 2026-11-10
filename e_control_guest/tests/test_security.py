@@ -116,6 +116,7 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
                      json={"permissions": permissions}).status_code == 200
     shared = admin.post(f"/api/admin/profiles/{profile['id']}/shares", headers=write,
                         json={"pin": "2468", "valid_minutes": 60, "max_sessions": 1}).json()
+    assert urlsplit(shared["fragment_url"]).path == "/guest-access"
     raw_token = shared["fragment_url"].split("#token=", 1)[1]
     database_text = (runtime.settings.data_dir / "guest.db").read_bytes()
     assert raw_token.encode() not in database_text
@@ -148,6 +149,12 @@ def test_end_to_end_share_login_read_command_and_revoke(runtime):
     share_id = shared["share"]["id"]
     assert admin.delete(f"/api/admin/shares/{share_id}", headers=write).status_code == 200
     assert guest.get("/api/guest/dashboard").status_code == 401
+
+
+def test_guest_entry_uses_dedicated_non_share_path(runtime):
+    guest = TestClient(create_guest_app(runtime))
+    assert guest.get("/guest-access").status_code == 200
+    assert guest.get("/share").status_code == 404
 
 
 def test_admin_requires_ingress(runtime):

@@ -18,6 +18,10 @@
 8. Crea il link indicando PIN, validità e numero massimo di sessioni. Il token
    completo viene mostrato una volta sola.
 
+I link generati dalla RC7 usano il percorso pubblico `/guest-access`. I link
+creati dalle versioni precedenti con il percorso `/share` vanno revocati e
+ricreati dopo l'aggiornamento.
+
 Ogni modifica a schede o permessi incrementa la revisione del profilo e rende
 inutilizzabili i link creati sulla revisione precedente. Crea un nuovo link dopo
 aver verificato la configurazione.

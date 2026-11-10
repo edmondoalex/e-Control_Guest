@@ -221,7 +221,7 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
                                        "max_sessions": share["max_sessions"],
                                        "pin_required": bool(payload.pin)})
         return {"share": share,
-                "fragment_url": f"{runtime.settings.guest_base_url}/share#token={token}"}
+                "fragment_url": f"{runtime.settings.guest_base_url}/guest-access#token={token}"}
 
     @app.delete("/api/admin/shares/{share_id}", dependencies=[Depends(require_csrf)])
     async def revoke_share(share_id: str, request: Request):
