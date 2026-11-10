@@ -121,7 +121,8 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
         runtime.audit.append(
             actor_type="guest", actor_id=runtime.user_agent_id(request), session_id=row["id"],
             action="login", resource=row["profile_id"], outcome="allowed",
-            metadata={"network_id": network_id, "expires_at": row["expires_at"]},
+            metadata={"network_id": network_id, "expires_at": row["expires_at"],
+                      "label": runtime.store.get_share(row["share_id"]).get("label", "")},
         )
         return {"csrf": csrf_token, "expires_at": row["expires_at"]}
 
@@ -198,10 +199,15 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
             if previous is not None:
                 return previous
             raise HTTPException(409, "Azione gia in corso")
+        share_label = runtime.store.get_share(current["sh"]).get("label", "")
+        entity_name = next((item.get("name") or payload.entity_id
+                            for item in card["config"]["entities"]
+                            if item["entity_id"] == payload.entity_id), payload.entity_id)
         runtime.audit.append(
             actor_type="guest", actor_id=runtime.user_agent_id(request), session_id=current["sid"],
             action="command_request", resource=payload.entity_id, request_id=payload.request_id,
-            outcome="allowed", metadata={"action": payload.action, "value": payload.value},
+            outcome="allowed", metadata={"label": share_label, "entity_name": entity_name,
+                                         "action": payload.action, "value": payload.value},
         )
         try:
             readback = public_state(await runtime.adapter.execute(command))
@@ -210,7 +216,9 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
                 actor_type="guest", actor_id=runtime.user_agent_id(request), session_id=current["sid"],
                 action="command_readback", resource=payload.entity_id,
                 request_id=payload.request_id, outcome="allowed",
-                metadata={"state": readback.get("state")},
+                metadata={"label": share_label, "entity_name": entity_name,
+                          "action": payload.action, "value": payload.value,
+                          "state": readback.get("state")},
             )
         except Exception as exc:
             result = {"ok": False, "request_id": payload.request_id, "error": "command_failed"}
@@ -218,7 +226,9 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
                 actor_type="guest", actor_id=runtime.user_agent_id(request), session_id=current["sid"],
                 action="command_readback", resource=payload.entity_id,
                 request_id=payload.request_id, outcome="error",
-                metadata={"error_type": type(exc).__name__},
+                metadata={"label": share_label, "entity_name": entity_name,
+                          "action": payload.action, "value": payload.value,
+                          "error_type": type(exc).__name__},
             )
         runtime.store.finish_operation(payload.request_id, result)
         if not result["ok"]:
