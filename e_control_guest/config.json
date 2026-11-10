@@ -1,10 +1,10 @@
 {
   "name": "e-Control Guest",
-  "version": "0.1.0-rc7",
+  "version": "0.1.0-rc8",
   "slug": "e_control_guest",
   "description": "Condivisione controllata e verificabile di dashboard Guest",
   "url": "https://github.com/edmondoalex/e-Control_Guest",
-  "arch": ["amd64"],
+  "arch": ["amd64", "aarch64"],
   "startup": "application",
   "boot": "manual",
   "init": false,

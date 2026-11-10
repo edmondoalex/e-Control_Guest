@@ -28,9 +28,21 @@ jobs:
         run: |
           python -m json.tool e_control_guest/config.json >/dev/null
           python -m json.tool e_control_guest/build.json >/dev/null
+          python - <<'PY'
+          import json
+          config = json.load(open('e_control_guest/config.json'))
+          build = json.load(open('e_control_guest/build.json'))
+          assert set(config['arch']) == {'amd64', 'aarch64'}
+          assert set(config['arch']) <= set(build['build_from'])
+          PY
           test -f repository.yaml
           test -x e_control_guest/rootfs/etc/services.d/e-control-guest/run
+      - uses: docker/setup-qemu-action@v3
       - name: Build amd64 add-on image
         run: |
           base=$(python -c "import json; print(json.load(open('e_control_guest/build.json'))['build_from']['amd64'])")
-          docker build --build-arg BUILD_FROM="$base" --tag e-control-guest:candidate e_control_guest
+          docker build --platform linux/amd64 --build-arg BUILD_FROM="$base" --tag e-control-guest:amd64-candidate e_control_guest
+      - name: Build aarch64 add-on image
+        run: |
+          base=$(python -c "import json; print(json.load(open('e_control_guest/build.json'))['build_from']['aarch64'])")
+          docker build --platform linux/arm64 --build-arg BUILD_FROM="$base" --tag e-control-guest:aarch64-candidate e_control_guest

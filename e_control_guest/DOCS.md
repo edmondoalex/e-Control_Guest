@@ -1,5 +1,7 @@
 # e-Control Guest — guida
 
+Architetture supportate: `amd64` e `aarch64`, inclusi Home Assistant Green.
+
 ## Prima configurazione
 
 1. Installa e avvia l'add-on.
