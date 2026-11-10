@@ -18,15 +18,19 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - run: python -m pip install -r requirements-dev.txt
+          cache-dependency-path: e_control_guest/requirements-dev.txt
+      - run: python -m pip install -r e_control_guest/requirements-dev.txt
       - run: python -m compileall -q app
+        working-directory: e_control_guest
       - run: python -m pytest -q
+        working-directory: e_control_guest
       - name: Validate add-on metadata
         run: |
-          python -m json.tool config.json >/dev/null
-          python -m json.tool build.json >/dev/null
-          test -x rootfs/etc/services.d/e-control-guest/run
+          python -m json.tool e_control_guest/config.json >/dev/null
+          python -m json.tool e_control_guest/build.json >/dev/null
+          test -f repository.yaml
+          test -x e_control_guest/rootfs/etc/services.d/e-control-guest/run
       - name: Build amd64 add-on image
         run: |
-          base=$(python -c "import json; print(json.load(open('build.json'))['build_from']['amd64'])")
-          docker build --build-arg BUILD_FROM="$base" --tag e-control-guest:candidate .
+          base=$(python -c "import json; print(json.load(open('e_control_guest/build.json'))['build_from']['amd64'])")
+          docker build --build-arg BUILD_FROM="$base" --tag e-control-guest:candidate e_control_guest

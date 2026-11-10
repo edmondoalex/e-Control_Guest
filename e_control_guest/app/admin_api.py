@@ -53,10 +53,10 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     async def require_ingress(request: Request) -> None:
-        if request.url.path == "/health" or runtime.settings.development_admin:
+        if runtime.settings.development_admin:
             return
-        if not (request.headers.get("x-ingress-path") or request.headers.get("x-hass-user-id")
-                or request.headers.get("x-remote-user-id")):
+        peer = request.client.host if request.client else ""
+        if peer != "172.30.32.2" or not request.headers.get("x-ingress-path"):
             runtime.audit.append(actor_type="admin", action="admin_access", outcome="denied",
                                  metadata={"network_id": runtime.network_id(request)})
             raise HTTPException(403, "Amministrazione disponibile soltanto tramite Ingress")
@@ -69,7 +69,10 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
             raise HTTPException(403, "Controllo CSRF non valido")
 
     @app.get("/health")
-    async def health():
+    async def health(request: Request):
+        peer = request.client.host if request.client else ""
+        if not runtime.settings.development_admin and peer not in {"127.0.0.1", "::1", "172.30.32.2"}:
+            raise HTTPException(403, "Health check locale")
         valid, broken_at = runtime.audit.verify()
         return {"status": "ok" if valid else "degraded", "audit_valid": valid, "broken_at": broken_at}
 

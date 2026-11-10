@@ -148,4 +148,6 @@ def test_admin_requires_ingress(runtime):
     client = TestClient(create_admin_app(runtime))
     runtime.settings = Settings(data_dir=runtime.settings.data_dir, development_admin=False)
     assert client.get("/").status_code == 403
+    assert client.get("/health").status_code == 403
+    runtime.settings = Settings(data_dir=runtime.settings.data_dir, development_admin=True)
     assert client.get("/health").status_code == 200
