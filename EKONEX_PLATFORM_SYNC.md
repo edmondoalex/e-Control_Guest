@@ -1,6 +1,6 @@
-## Handoff corrente - CHANGE059 implementazione locale pronta (11/11/2026)
+## Handoff corrente - RC34 pubblicata e qualificata (11/11/2026)
 
-Implementato localmente il ciclo sessione/PWA richiesto. Nuova opzione
+Pubblicato il ciclo sessione/PWA richiesto. Nuova opzione
 `session_idle_minutes` default 3: le sessioni oltre soglia vengono revocate e
 non contano nel limite; heartbeat autenticato ogni minuto, separato dal polling
 dati, mantiene la dashboard realmente aperta. La durata assoluta
@@ -15,9 +15,11 @@ l'associazione del dispositivo.
 
 File: `config.json`, `app/settings.py`, `app/runtime.py`, `app/storage.py`,
 `app/guest_api.py`, `app/static/guest.js`, `tests/test_security.py`, `DOCS.md`.
-Verifiche: 27 test PASS, compileall, node --check, JSON e diff-check PASS.
-Nessun commit, push, release, catalogo, installazione o accesso impianto.
-Prossimo gate: revisione/pubblicazione esplicita della candidata successiva.
+Verifiche locali: 27 test PASS, compileall, node --check, JSON e diff-check
+PASS. Commit `7efddbd`, tag e release `v0.1.0-rc34`; GitHub Actions
+`43006837215` (main) e `43006839956` (tag) PASS con build `amd64`, `aarch64`,
+`armv7`, `armhf` e `i386`. Catalogo, installazione e accesso impianto non
+eseguiti; il prossimo gate e l'aggiornamento esplicito su Home Assistant.
 
 ## Handoff corrente - RC33 pubblicata, metadati PWA Chrome (10/11/2026)
 
