@@ -1,3 +1,24 @@
+## Handoff corrente - CHANGE059 implementazione locale pronta (11/11/2026)
+
+Implementato localmente il ciclo sessione/PWA richiesto. Nuova opzione
+`session_idle_minutes` default 3: le sessioni oltre soglia vengono revocate e
+non contano nel limite; heartbeat autenticato ogni minuto, separato dal polling
+dati, mantiene la dashboard realmente aperta. La durata assoluta
+`session_minutes` resta invariata.
+
+Il primo login valido crea una credenziale dispositivo opaca: cookie Secure,
+HttpOnly, SameSite=Strict e solo digest nel nuovo archivio `device_grants`. La
+PWA avviata senza frammento puo risolvere la share associata e richiede di nuovo
+il PIN; token Guest assente da manifest, URL PWA e storage JavaScript. Revoca
+share invalida sessioni e grant; logout chiude la sessione ma conserva
+l'associazione del dispositivo.
+
+File: `config.json`, `app/settings.py`, `app/runtime.py`, `app/storage.py`,
+`app/guest_api.py`, `app/static/guest.js`, `tests/test_security.py`, `DOCS.md`.
+Verifiche: 27 test PASS, compileall, node --check, JSON e diff-check PASS.
+Nessun commit, push, release, catalogo, installazione o accesso impianto.
+Prossimo gate: revisione/pubblicazione esplicita della candidata successiva.
+
 ## Handoff corrente - RC33 pubblicata, metadati PWA Chrome (10/11/2026)
 
 Aggiunto `mobile-web-app-capable=yes` accanto al metadato Apple per eliminare

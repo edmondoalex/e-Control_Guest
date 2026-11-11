@@ -62,6 +62,9 @@ dominio o un servizio Home Assistant arbitrario.
 - `allow_insecure_local_http`: consente cookie Guest senza flag `Secure` solo
   per prove temporanee sulla LAN; deve restare `false` in produzione;
 - `session_minutes`: durata massima della sessione, da 5 a 240 minuti;
+- `session_idle_minutes`: inattivita massima prima di liberare automaticamente
+  lo slot, da 1 a 60 minuti (default 3); un heartbeat dedicato mantiene attiva
+  la dashboard aperta anche con polling dati piu lento;
 - `audit_retention_days`: riserva per la politica di conservazione; la RC non
   elimina automaticamente eventi;
 - `trusted_proxy_cidrs`: proxy autorizzati a fornire `X-Forwarded-For`. Se il

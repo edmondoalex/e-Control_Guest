@@ -20,9 +20,10 @@ class StoreError(RuntimeError):
 
 
 class GuestStore:
-    def __init__(self, database: Path, token_key: bytes):
+    def __init__(self, database: Path, token_key: bytes, *, idle_seconds: int = 180):
         self.database = database
         self.token_key = token_key
+        self.idle_seconds = max(60, int(idle_seconds))
         self._lock = threading.RLock()
         database.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
@@ -57,8 +58,15 @@ class GuestStore:
                     request_id TEXT PRIMARY KEY, session_id TEXT NOT NULL,
                     created_at REAL NOT NULL, result_json TEXT
                 );
+                CREATE TABLE IF NOT EXISTS device_grants (
+                    id TEXT PRIMARY KEY, share_id TEXT NOT NULL REFERENCES shares(id) ON DELETE CASCADE,
+                    grant_digest TEXT NOT NULL UNIQUE, device_digest TEXT NOT NULL,
+                    expires_at REAL NOT NULL, revoked INTEGER NOT NULL,
+                    created_at REAL NOT NULL, last_seen_at REAL NOT NULL
+                );
                 CREATE INDEX IF NOT EXISTS ix_cards_profile ON cards(profile_id);
                 CREATE INDEX IF NOT EXISTS ix_sessions_share ON sessions(share_id, expires_at);
+                CREATE INDEX IF NOT EXISTS ix_device_grants_share ON device_grants(share_id, expires_at);
             """)
             columns = {row[1] for row in connection.execute("PRAGMA table_info(shares)")}
             if "label" not in columns:
@@ -333,10 +341,11 @@ class GuestStore:
             "SELECT s.id,s.profile_id,s.enabled,s.label,s.expires_at,s.max_sessions,s.profile_revision,s.created_at,"
             "s.revoked_reason,s.revoked_by,s.revoked_at,1 AS revision_valid,"
             "(SELECT COUNT(*) FROM sessions x WHERE x.share_id=s.id AND x.revoked=0 "
-            "AND x.expires_at>?) AS active_sessions "
+            "AND x.expires_at>? AND x.last_seen_at>?) AS active_sessions "
             "FROM shares s JOIN profiles p ON p.id=s.profile_id"
         )
-        args: tuple = (_now(),)
+        now = _now()
+        args: tuple = (now, now - self.idle_seconds)
         if profile_id:
             query += " WHERE s.profile_id=?"
             args += (profile_id,)
@@ -427,9 +436,13 @@ class GuestStore:
                 "WHERE share_id=? AND device_digest=? AND revoked=0",
                 (share["id"], device_digest),
             )
+            connection.execute(
+                "UPDATE sessions SET revoked=1 WHERE revoked=0 AND last_seen_at<=?",
+                (now - self.idle_seconds,),
+            )
             active = connection.execute(
-                "SELECT COUNT(*) FROM sessions WHERE share_id=? AND revoked=0 AND expires_at>?",
-                (share["id"], now),
+                "SELECT COUNT(*) FROM sessions WHERE share_id=? AND revoked=0 AND expires_at>? AND last_seen_at>?",
+                (share["id"], now, now - self.idle_seconds),
             ).fetchone()[0]
             if active >= share["max_sessions"]:
                 raise StoreError("session_limit")
@@ -447,13 +460,57 @@ class GuestStore:
             "profile_revision": profile["revision"], "expires_at": expires_at,
         }
 
+    def create_device_grant(self, share_id: str, device_token: str) -> tuple[str, float]:
+        now = _now()
+        raw = __import__("secrets").token_urlsafe(32)
+        with self._lock, self._connect() as connection:
+            share = connection.execute("SELECT enabled,expires_at FROM shares WHERE id=?", (share_id,)).fetchone()
+            if share is None or not share["enabled"] or share["expires_at"] <= now:
+                raise StoreError("share_unavailable")
+            device_digest = token_digest(self.token_key, device_token)
+            recovery_digest = token_digest(
+                self.token_key, recoverable_share_token(self.token_key, share_id))
+            connection.execute(
+                "UPDATE shares SET recovery_token_digest=? WHERE id=? AND recovery_token_digest IS NULL",
+                (recovery_digest, share_id))
+            connection.execute("UPDATE device_grants SET revoked=1 WHERE share_id=? AND device_digest=?",
+                               (share_id, device_digest))
+            connection.execute("INSERT INTO device_grants VALUES (?,?,?,?,?,?,?,?)",
+                               (str(uuid.uuid4()), share_id, token_digest(self.token_key, raw), device_digest,
+                                float(share["expires_at"]), 0, now, now))
+        return raw, float(share["expires_at"])
+
+    def authenticate_device_grant(self, raw_grant: str, pin: str | None, *, csrf_token: str,
+                                  device_token: str, lifetime_seconds: int,
+                                  replace_session_id: str | None = None) -> dict:
+        now = _now()
+        digest = token_digest(self.token_key, raw_grant)
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT g.share_id,g.device_digest FROM device_grants g JOIN shares s ON s.id=g.share_id "
+                "WHERE g.grant_digest=? AND g.revoked=0 AND g.expires_at>? AND s.enabled=1 AND s.expires_at>?",
+                (digest, now, now)).fetchone()
+        if row is None or row["device_digest"] != token_digest(self.token_key, device_token):
+            raise StoreError("share_unavailable")
+        result = self.authenticate_share(
+            recoverable_share_token(self.token_key, row["share_id"]), pin,
+            csrf_token=csrf_token, device_token=device_token,
+            lifetime_seconds=lifetime_seconds, replace_session_id=replace_session_id)
+        with self._connect() as connection:
+            connection.execute("UPDATE device_grants SET last_seen_at=? WHERE grant_digest=?", (now, digest))
+        return result
+
     def validate_session(self, session_id: str, share_id: str, profile_id: str, revision: int,
                          csrf_token: str | None = None, device_token: str | None = None) -> dict:
         now = _now()
         with self._connect() as connection:
             row = connection.execute("SELECT * FROM sessions WHERE id=?", (session_id,)).fetchone()
             profile = connection.execute("SELECT revision,active FROM profiles WHERE id=?", (profile_id,)).fetchone()
-        if row is None or row["revoked"] or row["expires_at"] <= now:
+        if row is None or row["revoked"] or row["expires_at"] <= now \
+                or row["last_seen_at"] <= now - self.idle_seconds:
+            if row is not None and not row["revoked"]:
+                with self._connect() as connection:
+                    connection.execute("UPDATE sessions SET revoked=1 WHERE id=?", (session_id,))
             raise StoreError("session_unavailable")
         if row["share_id"] != share_id or row["profile_id"] != profile_id \
                 or row["profile_revision"] != revision or profile is None \
@@ -514,6 +571,7 @@ class GuestStore:
                 (reason, actor_id, _now(), share_id),
             )
             connection.execute("UPDATE sessions SET revoked=1 WHERE share_id=?", (share_id,))
+            connection.execute("UPDATE device_grants SET revoked=1 WHERE share_id=?", (share_id,))
             connection.commit()
 
     def revoke_session(self, session_id: str) -> None:

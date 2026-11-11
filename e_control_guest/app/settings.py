@@ -12,6 +12,7 @@ class Settings:
     admin_port: int = 8099
     guest_port: int = 8100
     session_minutes: int = 30
+    session_idle_minutes: int = 3
     polling_seconds: int = 60
     audit_retention_days: int = 365
     audit_max_events: int = 100_000
@@ -42,6 +43,7 @@ class Settings:
             data_dir=data_dir,
             guest_port=bounded("guest_port", 8100, 1024, 65535),
             session_minutes=bounded("session_minutes", 30, 5, 240),
+            session_idle_minutes=bounded("session_idle_minutes", 3, 1, 60),
             polling_seconds=bounded("polling_seconds", 60, 15, 3600),
             audit_retention_days=bounded("audit_retention_days", 365, 30, 3650),
             audit_max_events=bounded("audit_max_events", 100_000, 1000, 1_000_000),

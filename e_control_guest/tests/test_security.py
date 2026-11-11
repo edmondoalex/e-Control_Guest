@@ -267,6 +267,32 @@ def test_admin_can_close_active_sessions_without_revoking_share(runtime):
         ).status_code == 200
 
 
+def test_idle_session_releases_slot_and_pwa_grant_resumes_without_token(runtime):
+    admin = TestClient(create_admin_app(runtime))
+    headers = {"x-hass-user-id": "admin-1"}
+    csrf = admin.get("/api/admin/bootstrap", headers=headers).json()["csrf"]
+    write = {**headers, "X-eControl-CSRF": csrf}
+    profile = admin.post("/api/admin/profiles", headers=write, json={"name": "PWA"}).json()
+    created = admin.post(
+        f"/api/admin/profiles/{profile['id']}/shares", headers=write,
+        json={"label": "Telefono", "pin": "1234", "valid_minutes": 60, "max_sessions": 1},
+    ).json()
+    token = created["fragment_url"].split("#token=", 1)[1]
+    guest = TestClient(create_guest_app(runtime))
+    first = guest.post("/api/guest/login", json={"token": token, "pin": "1234"})
+    assert first.status_code == 200
+    assert guest.cookies.get("ecg_grant")
+    with sqlite3.connect(runtime.settings.data_dir / "guest.db") as connection:
+        connection.execute("UPDATE sessions SET last_seen_at=?", (time.time() - 3600,))
+    listed = admin.get(f"/api/admin/profiles/{profile['id']}", headers=headers).json()["shares"]
+    assert listed[0]["active_sessions"] == 0
+    assert guest.get("/api/guest/dashboard").status_code == 401
+    guest.cookies.delete("ecg_session")
+    resumed = guest.post("/api/guest/login", json={"token": "", "pin": "1234"})
+    assert resumed.status_code == 200
+    assert guest.get("/api/guest/dashboard").status_code == 200
+
+
 def test_guest_entry_uses_dedicated_non_share_path(runtime):
     guest = TestClient(create_guest_app(runtime))
     page = guest.get("/guest-access")

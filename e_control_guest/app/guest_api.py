@@ -21,7 +21,7 @@ STATIC = Path(__file__).with_name("static")
 
 
 class Login(BaseModel):
-    token: str = Field(min_length=30, max_length=100)
+    token: str = Field(default="", max_length=100)
     pin: str | None = Field(default=None, max_length=12)
 
 
@@ -107,6 +107,7 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
         response: Response,
         ecg_device: str | None = Cookie(default=None),
         ecg_session: str | None = Cookie(default=None),
+        ecg_grant: str | None = Cookie(default=None),
     ):
         network_id = runtime.network_id(request)
         try:
@@ -124,11 +125,12 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
                 # An expired or invalid browser cookie must not block a fresh login.
                 pass
         try:
-            row = runtime.store.authenticate_share(
-                payload.token, payload.pin, csrf_token=csrf_token, device_token=device_token,
-                lifetime_seconds=runtime.settings.session_minutes * 60,
-                replace_session_id=replace_session_id,
-            )
+            authenticate = (runtime.store.authenticate_share if payload.token
+                            else runtime.store.authenticate_device_grant)
+            row = authenticate(
+                payload.token or ecg_grant or "", payload.pin, csrf_token=csrf_token,
+                device_token=device_token, lifetime_seconds=runtime.settings.session_minutes * 60,
+                replace_session_id=replace_session_id)
         except StoreError as exc:
             reason = str(exc)
             audit_denied(request, "login", reason)
@@ -160,6 +162,13 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
                             secure=secure, samesite="strict", path="/")
         response.set_cookie("ecg_device", device_token, max_age=lifetime, httponly=True,
                             secure=secure, samesite="strict", path="/")
+        if payload.token:
+            grant, grant_expires = runtime.store.create_device_grant(row["share_id"], device_token)
+            grant_lifetime = max(1, int(grant_expires) - int(__import__("time").time()))
+            response.set_cookie("ecg_grant", grant, max_age=grant_lifetime, httponly=True,
+                                secure=secure, samesite="strict", path="/")
+            response.set_cookie("ecg_device", device_token, max_age=grant_lifetime, httponly=True,
+                                secure=secure, samesite="strict", path="/")
         runtime.audit.append(
             actor_type="guest", actor_id=runtime.user_agent_id(request), session_id=row["id"],
             action="login", resource=row["profile_id"], outcome="allowed",
@@ -167,6 +176,10 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
                       "label": runtime.store.get_share(row["share_id"]).get("label", "")},
         )
         return {"csrf": csrf_token, "expires_at": row["expires_at"]}
+
+    @app.post("/api/guest/heartbeat")
+    async def heartbeat(current: dict = Depends(write_session)):
+        return {"ok": True, "expires_at": current["row"]["expires_at"]}
 
     @app.get("/api/guest/dashboard")
     async def dashboard(request: Request, current: dict = Depends(session)):
@@ -293,7 +306,6 @@ def create_guest_app(runtime: Runtime) -> FastAPI:
     async def logout(response: Response, current: dict = Depends(write_session)):
         runtime.store.revoke_session(current["sid"])
         response.delete_cookie("ecg_session", path="/")
-        response.delete_cookie("ecg_device", path="/")
         runtime.audit.append(actor_type="guest", session_id=current["sid"], action="logout",
                              resource=current["pr"], outcome="allowed")
         return {"ok": True}
