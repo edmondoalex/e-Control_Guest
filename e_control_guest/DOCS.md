@@ -1,5 +1,53 @@
 # e-Control Guest — guida
 
+## Canali pubblico ed Ekonex
+
+Il repository pubblico resta disponibile e source-build: le macchine non
+migrate continuano ad aggiornarsi da questo stesso URL. Il catalogo Ekonex
+aggiunge la stessa APP con immagine precompilata privata dalla medesima
+revisione qualificata. Non installare una seconda copia per cambiare canale:
+lo slug del repository cambia e i dati non vengono trasferiti automaticamente.
+e-Control riconosce entrambi i canali e conserva quello gia installato.
+Le release successive devono pubblicare e qualificare entrambi i canali dalla
+stessa revisione; il solo push della fonte pubblica non aggiorna il catalogo.
+
+## IP pubblico, Paese e citta attraverso Cloudflare
+
+`CF-Connecting-IP` e gli header geografici vengono letti esclusivamente da
+connector esplicitamente autorizzati. Per la citta attivare in Cloudflare
+**Rules / Transform Rules / Managed Transforms / Add visitor location headers**:
+fornisce `cf-ipcity` e `cf-ipcountry`. Non e necessario alcun servizio GeoIP
+aggiuntivo e Guest non invia IP a servizi esterni. La citta e indicativa
+dell'IP, non GPS: VPN, operatore mobile e provider possono mostrarne un'altra.
+
+Se il collegamento arriva dal gateway HA condiviso `172.30.32.1`, il solo
+indirizzo non prova quale proxy abbia inviato gli header. Per questo percorso:
+
+1. Creare una chiave casuale di almeno 32 caratteri ASCII in un gestore sicuro;
+   non inviarla in chat o inserirla in URL/log.
+2. Sul solo hostname Guest, aggiungere una Request Header Transform Rule
+   Cloudflare **Set static** per `X-eControl-Proxy-Secret`, con la chiave.
+   La regola deve sovrascrivere il valore del client, non conservarlo/aggiungerlo.
+3. Nelle opzioni APP Guest impostare `cloudflare_proxy_cidrs` al solo indirizzo
+   del peer verificato (/32 IPv4 o /128 IPv6), e `cloudflare_proxy_secret` alla
+   stessa chiave. Non aggiungere l'intera rete o il gateway a `trusted_proxy_cidrs`.
+4. Dopo salvataggio/riavvio esplicito dell'APP, eseguire un nuovo login dal
+   dominio HTTPS e verificare IP, Paese e citta nel nuovo evento.
+
+Senza prova valida, gli header non vengono usati ne per l'audit ne per il rate
+limit. La chiave non viene esposta da API o audit. Questo controllo attesta
+soltanto la provenienza del proxy, non concede accesso Guest o amministrativo.
+Un connector con IP dedicato e percorso esclusivamente controllato puo usare
+i CIDR dedicati; la chiave opzionale aggiunge comunque una seconda verifica.
+Nessuna configurazione Cloudflare/impianto viene cambiata automaticamente.
+
+Gli eventi precedenti non possono essere corretti retroattivamente. IP interno
+e IP pubblico sono distinti visibilmente; mancanza del metadato citta non viene
+sostituita con la posizione del server o con un valore inventato.
+
+Fonti: [header geografici Cloudflare](https://developers.cloudflare.com/rules/transform/managed-transforms/reference/#add-visitor-location-headers)
+e [regole di modifica header](https://developers.cloudflare.com/rules/transform/request-header-modification/create-dashboard/).
+
 Architetture supportate: `amd64`, `aarch64`, `armv7`, `armhf` e `i386`,
 inclusi Home Assistant Green e i sistemi Home Assistant legacy supportati dal
 Supervisor.

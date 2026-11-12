@@ -14,7 +14,12 @@
 .audit-pagination { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
 .audit-pagination p { margin: 0; flex: 1 1 240px; }
 #audit-error { min-height: 1.4em; color: #ff7187; }
-#audit-table td { overflow-wrap: anywhere; }
+#audit-table { table-layout: fixed; min-width: 920px; }
+#audit-table td, #audit-table th { overflow-wrap: anywhere; white-space: normal; }
+#audit-table th:nth-child(4) { width: 24%; }
+#audit-table th:nth-child(5) { width: 20%; }
+.audit-origin-source { display: block; color: var(--muted); margin-top: 4px; }
+main > section, main > div, .table-wrap { min-width: 0; max-width: 100%; }
 .permission-card { padding: 0; overflow: hidden; }
 .permission-card > summary { display: flex; align-items: center; gap: 12px; padding: 16px 18px; cursor: pointer; list-style: none; }
 .permission-card > summary::-webkit-details-marker { display: none; }

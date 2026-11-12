@@ -22,10 +22,11 @@ const page=(number,events=Array.from({length:number===3?1:100},(_,i)=>event(202-
 test('new columns follow details, controls are accessible, and assets are cache-busted',()=>{
  assert.ok(html.indexOf('>Dettagli<')<html.indexOf('>IP provenienza<'));
  assert.ok(html.indexOf('>IP provenienza<')<html.indexOf('>Paese<'));
- assert.ok(html.indexOf('>Paese<')<html.indexOf('>Esito<'));
+ assert.ok(html.indexOf('>Paese<')<html.indexOf('>Città indicativa<'));
+ assert.ok(html.indexOf('>Città indicativa<')<html.indexOf('>Esito<'));
  for(const id of ['first','previous','next','last'])assert.ok(html.includes('id="audit-'+id+'"'));
  assert.match(html,/aria-label="Pagine del registro"/);assert.match(html,/id="audit-error" role="alert"/);
- assert.match(html,/admin.js\?v=20261112-audit065/);assert.doesNotMatch(source,/audit\?limit=1000/);
+ assert.match(html,/admin.js\?v=20261112-catalog066/);assert.doesNotMatch(source,/audit\?limit=1000/);
 });
 
 test('renders at most100 rows, legacy data is not invented and all origin data is escaped',()=>{
@@ -36,7 +37,20 @@ test('renders at most100 rows, legacy data is not invented and all origin data i
  assert.match(body,/&lt;img onerror=bad&gt;/);assert.doesNotMatch(body,/<img/);
  assert.match(body,/Non registrato/);assert.match(body,/Non disponibile/);
  assert.equal(h.api.auditOrigin({metadata:{origin:{country_code:'T1'}}}).country,'Rete Tor');
- assert.equal(h.api.auditOrigin({metadata:{origin:{network_kind:'local'}}}).country,'Rete locale');
+ assert.equal(h.api.auditOrigin({metadata:{origin:{network_kind:'local'}}}).country,'Non rilevabile (IP interno)');
+});
+
+test('internal peer is visibly distinguished from verified visitor IP without changing audit data',()=>{
+ const h=harness(),e=event(1);e.metadata.origin={client_ip:'172.30.32.1',network_kind:'local',ip_source:'peer'};
+ const before=JSON.stringify(e);h.api.S.auditEvents=[e];h.api.renderAudit();const body=h.node('#audit').innerHTML;
+ assert.match(body,/172\.30\.32\.1/);assert.match(body,/<small class="audit-origin-source">IP interno del collegamento/);
+ assert.match(body,/IP pubblico ospite non rilevato/);assert.match(body,/Non rilevabile \(IP interno\)/);
+ assert.equal(JSON.stringify(e),before);
+ assert.match(h.api.auditOrigin({metadata:{origin:{ip_source:'cloudflare'}}}).source,/IP visitatore/);
+ assert.match(h.api.auditOrigin({metadata:{origin:{ip_source:'proxy_unresolved'}}}).source,/IP del proxy/);
+ const origin={ip_source:'cloudflare',city_source:'cloudflare',city:'Città sintetica'};
+ assert.equal(h.api.auditOrigin({metadata:{origin}}).city,'Città sintetica');
+ assert.equal(h.api.auditOrigin({metadata:{origin:{...origin,ip_source:'peer'}}}).city,'Non disponibile');
 });
 
 test('navigation fetches only one page and keeps snapshot; refresh resets it',async()=>{

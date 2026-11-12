@@ -1,5 +1,7 @@
 """Request origin evidence. No DNS, geolocation service or network requests."""
 import ipaddress
+import hmac
+import unicodedata
 
 
 COUNTRIES = frozenset("""AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF
@@ -42,12 +44,38 @@ def single_header(request, name):
     return values[0].strip() if len(values) == 1 else ""
 
 
+def location_header(request, name):
+    """Bounded text from verified Cloudflare location headers, never raw data."""
+    raw = single_header(request, name)
+    try:
+        raw = raw.encode('latin1').decode('utf8')
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        pass
+    value = unicodedata.normalize('NFC', raw).strip()
+    if (not value or len(value) > 100 or any(unicodedata.category(c).startswith('C') for c in value)
+            or any(c in '<>"\\' for c in value)):
+        return ''
+    return value
+
+
 def request_origin(request, settings):
     peer = address(request.client.host if request.client else "")
-    client, source, country = peer, "peer", ""
-    cloudflare = trusted(peer, settings.cloudflare_proxy_cidrs)
-    cidrs = settings.trusted_proxy_cidrs + settings.cloudflare_proxy_cidrs
-    if trusted(peer, cidrs):
+    client, source, country, city = peer, "peer", "", ""
+    cloudflare_peer = trusted(peer, settings.cloudflare_proxy_cidrs)
+    secret = settings.cloudflare_proxy_secret
+    supplied = single_header(request, 'x-econtrol-proxy-secret')
+    secret_valid = (32 <= len(secret) <= 256 and secret.isascii()
+                    and hmac.compare_digest(secret, supplied) if supplied.isascii() else False)
+    # This standard HA host gateway is shared by traffic sources. A CIDR alone
+    # does not establish which process forwarded a request through it.
+    shared_gateway = str(peer) == '172.30.32.1'
+    proof_required = bool(secret) or shared_gateway
+    cloudflare = cloudflare_peer and (not proof_required or secret_valid)
+    proof_failed = cloudflare_peer and proof_required and not secret_valid
+    cidrs = settings.trusted_proxy_cidrs + (settings.cloudflare_proxy_cidrs if cloudflare else ())
+    if proof_failed:
+        source = 'proxy_unresolved'
+    if not proof_failed and trusted(peer, cidrs):
         source = "proxy_unresolved"
         if cloudflare:
             # Only an explicitly authorized Cloudflare connector may supply
@@ -64,6 +92,8 @@ def request_origin(request, settings):
                 # a geographic country in this unsupported path.
                 if not request.headers.get("cf-worker") and (code in COUNTRIES or code == "T1"):
                     country = code
+                if not request.headers.get("cf-worker") and code in COUNTRIES:
+                    city = location_header(request, 'cf-ipcity')
         if source == "proxy_unresolved":
             forwarded = single_header(request, "x-forwarded-for")
             parts = forwarded.split(",") if forwarded and len(forwarded) <= 2048 else []
@@ -81,4 +111,5 @@ def request_origin(request, settings):
     kind = "unknown" if client is None else "public" if client.is_global else "local"
     return {"client_ip": str(client) if client is not None else "",
             "ip_source": source, "country_code": country,
-            "country_source": "cloudflare" if country else "", "network_kind": kind}
+            "country_source": "cloudflare" if country else "", "network_kind": kind,
+            "city": city, "city_source": "cloudflare" if city else ""}

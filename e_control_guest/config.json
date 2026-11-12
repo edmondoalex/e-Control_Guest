@@ -1,6 +1,6 @@
 {
   "name": "e-Control Guest",
-  "version": "0.1.0-rc35",
+  "version": "0.1.0-rc36",
   "slug": "e_control_guest",
   "description": "Condivisione controllata e verificabile di dashboard Guest",
   "url": "https://github.com/edmondoalex/e-Control_Guest",
@@ -29,7 +29,8 @@
     "audit_retention_days": 365,
     "audit_max_events": 100000,
     "trusted_proxy_cidrs": [],
-    "cloudflare_proxy_cidrs": []
+    "cloudflare_proxy_cidrs": [],
+    "cloudflare_proxy_secret": ""
   },
   "schema": {
     "guest_port": "port",
@@ -41,6 +42,7 @@
     "audit_retention_days": "int(30,3650)",
     "audit_max_events": "int(1000,1000000)",
     "trusted_proxy_cidrs": ["str"],
-    "cloudflare_proxy_cidrs": ["str"]
+    "cloudflare_proxy_cidrs": ["str"],
+    "cloudflare_proxy_secret": "password?"
   }
 }

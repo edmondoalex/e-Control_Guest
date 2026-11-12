@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -20,6 +20,7 @@ class Settings:
     allow_insecure_local_http: bool = False
     trusted_proxy_cidrs: tuple[str, ...] = ()
     cloudflare_proxy_cidrs: tuple[str, ...] = ()
+    cloudflare_proxy_secret: str = field(default="", repr=False)
     supervisor_url: str = "http://supervisor"
     supervisor_token: str = ""
     development_admin: bool = False
@@ -58,6 +59,7 @@ class Settings:
                 str(item).strip() for item in options.get("cloudflare_proxy_cidrs", [])
                 if isinstance(item, str) and item.strip()
             ),
+            cloudflare_proxy_secret=str(options.get("cloudflare_proxy_secret", "")),
             supervisor_url=os.environ.get("SUPERVISOR_URL", "http://supervisor").rstrip("/"),
             supervisor_token=os.environ.get("SUPERVISOR_TOKEN", ""),
             development_admin=os.environ.get("ECONTROL_GUEST_DEV_ADMIN") == "1",

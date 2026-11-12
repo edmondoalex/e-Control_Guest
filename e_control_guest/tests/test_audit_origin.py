@@ -32,6 +32,51 @@ def test_direct_origin_ignores_forged_forwarded_and_country_headers(tmp_path):
     assert origin["ip_source"] == "peer"
 
 
+@pytest.mark.parametrize('proof', ['', 'bad', 's'*32])
+def test_shared_gateway_requires_secret_proof_before_original_ip_and_city(tmp_path, proof):
+    settings=Settings(data_dir=tmp_path,cloudflare_proxy_cidrs=('172.30.32.1/32',),
+                      trusted_proxy_cidrs=('172.30.32.1/32',),cloudflare_proxy_secret='s'*32)
+    runtime=build_runtime(settings)
+    headers=[('cf-connecting-ip','1.1.1.1'),('cf-ipcountry','IT'),('cf-ipcity','Città sintetica'),
+             ('x-forwarded-for','8.8.8.8'),('x-econtrol-proxy-secret',proof)]
+    origin=runtime.request_origin(request('172.30.32.1',headers))
+    if proof=='s'*32:
+        assert origin['client_ip']=='1.1.1.1' and origin['city']=='Città sintetica'
+        assert origin['city_source']=='cloudflare' and origin['country_code']=='IT'
+    else:
+        assert origin['client_ip']=='172.30.32.1' and not origin['city'] and not origin['country_code']
+        assert origin['ip_source']=='proxy_unresolved'
+    assert 's'*32 not in json.dumps(origin) and 's'*32 not in repr(settings)
+
+
+def test_shared_gateway_without_configured_secret_cannot_supply_identity(tmp_path):
+    runtime=build_runtime(Settings(data_dir=tmp_path,cloudflare_proxy_cidrs=('172.30.32.1/32',)))
+    result=runtime.request_origin(request('172.30.32.1',[('cf-connecting-ip','1.1.1.1'),('cf-ipcountry','IT')]))
+    assert result['client_ip']=='172.30.32.1' and result['ip_source']=='proxy_unresolved'
+
+
+def test_city_headers_are_trusted_bounded_unique_and_never_from_worker_or_direct(tmp_path):
+    from app.origin import request_origin
+    settings=Settings(data_dir=tmp_path,cloudflare_proxy_cidrs=('172.30.33.3/32',))
+    base=[('cf-connecting-ip','1.1.1.1'),('cf-ipcountry','IT')]
+    for city in ['<script>','a'*101,'fake\x00city']:
+        assert request_origin(request('172.30.33.3',base+[('cf-ipcity',city)]),settings)['city']==''
+    for more in [[('cf-ipcity','A'),('cf-ipcity','B')],[('cf-ipcity','A'),('cf-worker','example.test')]]:
+        assert request_origin(request('172.30.33.3',base+more),settings)['city']==''
+    assert request_origin(request('8.8.8.8',base+[('cf-ipcity','A')]),settings)['city']==''
+    assert request_origin(request('172.30.33.3',base+[('cf-ipcity','A')]),settings)['city']=='A'
+
+
+def test_duplicate_proxy_secret_cannot_pass_and_secret_never_enters_signed_audit(tmp_path):
+    runtime=build_runtime(Settings(data_dir=tmp_path,cloudflare_proxy_cidrs=('172.30.32.1/32',),cloudflare_proxy_secret='s'*32))
+    headers=[('cf-connecting-ip','1.1.1.1'),('x-econtrol-proxy-secret','s'*32)]
+    result=runtime.request_origin(request('172.30.32.1',headers+headers[-1:]))
+    assert result['client_ip']=='172.30.32.1'
+    with runtime.audit.request_context(runtime.request_origin(request('172.30.32.1',headers))):
+        runtime.audit.append(actor_type='guest',action='login',outcome='allowed')
+    assert 's'*32 not in json.dumps(runtime.audit.page())
+
+
 def test_pages_cover_retained_history_and_snapshot_does_not_shift_on_append(tmp_path):
     audit = AuditLog(tmp_path / "audit.db", b"s" * 32)
     for number in range(205):

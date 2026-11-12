@@ -29,9 +29,10 @@ function auditOrigin(e){
  let country='Non disponibile';
  if(code==='T1')country='Rete Tor';
  else if(/^[A-Z]{2}$/.test(code)){try{country=`${new Intl.DisplayNames(['it'],{type:'region'}).of(code)} (${code})`}catch{country=code}}
- else if(origin.network_kind==='local')country='Rete locale';
- const source={peer:'Peer diretto',forwarded:'Proxy fidato · X-Forwarded-For',cloudflare:'Connector Cloudflare fidato',proxy_unresolved:'IP del proxy: origine visitatore non disponibile'}[origin.ip_source]||'Origine non registrata';
- return {ip:ip||'Non registrato',country,source};
+ else if(origin.network_kind==='local')country='Non rilevabile (IP interno)';
+ const source=origin.ip_source==='peer'&&origin.network_kind==='local'?'IP interno del collegamento · IP pubblico ospite non rilevato':({peer:'IP del collegamento · eventuale proxy non verificato',forwarded:'IP visitatore · proxy fidato',cloudflare:'IP visitatore · connector Cloudflare fidato',proxy_unresolved:'IP del proxy · IP pubblico ospite non rilevato'}[origin.ip_source]||'Origine non registrata');
+ const city=origin.ip_source==='cloudflare'&&origin.city_source==='cloudflare'&&typeof origin.city==='string'?origin.city:'';
+ return {ip:ip||'Non registrato',country,source,city:city||'Non disponibile'};
 }
 function auditPager(){
  for(const id of ['audit-first','audit-previous'])$("#"+id).disabled=S.auditBusy||S.auditPage<=1;
@@ -40,7 +41,7 @@ function auditPager(){
  $('#audit-table').setAttribute('aria-busy',String(S.auditBusy));
 }
 function renderAudit(){
- $('#audit').innerHTML=S.auditEvents.slice(0,100).map(e=>{const m=e.metadata||{},who=e.actor_type==='guest'?(m.label||`Guest ${e.session_id?.slice(0,8)||''}`):(e.actor_id||e.actor_type||'sistema'),origin=auditOrigin(e);return `<tr><td>${esc(new Date(e.occurred_at).toLocaleString())}</td><td>${esc(who)}</td><td>${esc(actionLabel(e.action))}</td><td>${esc(auditDetails(e))}</td><td title="${esc(origin.source)}">${esc(origin.ip)}</td><td title="Paese indicativo dell’IP, non identità della persona">${esc(origin.country)}</td><td class="${e.outcome==='allowed'?'ok':e.outcome==='denied'?'warn':'error'}">${esc(e.outcome==='allowed'?'Riuscito':e.outcome==='denied'?'Negato':'Errore')}</td></tr>`}).join('')||'<tr><td colspan="7" class="muted">Nessun evento corrispondente.</td></tr>';
+ $('#audit').innerHTML=S.auditEvents.slice(0,100).map(e=>{const m=e.metadata||{},who=e.actor_type==='guest'?(m.label||`Guest ${e.session_id?.slice(0,8)||''}`):(e.actor_id||e.actor_type||'sistema'),origin=auditOrigin(e);return `<tr><td>${esc(new Date(e.occurred_at).toLocaleString())}</td><td>${esc(who)}</td><td>${esc(actionLabel(e.action))}</td><td>${esc(auditDetails(e))}</td><td title="${esc(origin.source)}">${esc(origin.ip)}<small class="audit-origin-source">${esc(origin.source)}</small></td><td title="Paese indicativo dell’IP, non identità della persona">${esc(origin.country)}</td><td title="Città stimata dell’IP, non posizione precisa della persona">${esc(origin.city)}</td><td class="${e.outcome==='allowed'?'ok':e.outcome==='denied'?'warn':'error'}">${esc(e.outcome==='allowed'?'Riuscito':e.outcome==='denied'?'Negato':'Errore')}</td></tr>`}).join('')||'<tr><td colspan="8" class="muted">Nessun evento corrispondente.</td></tr>';
  const start=S.auditTotal?(S.auditPage-1)*100+1:0,end=Math.min(S.auditPage*100,S.auditTotal);
  $('#audit-page-info').textContent=`Pagina ${S.auditPage} di ${S.auditPages} · righe ${start}–${end} di ${S.auditTotal} · 100 per pagina`;
  auditPager();
