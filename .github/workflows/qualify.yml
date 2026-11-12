@@ -24,6 +24,10 @@ jobs:
         working-directory: e_control_guest
       - run: python -m pytest -q
         working-directory: e_control_guest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test e_control_guest/tests/test_audit_ui.cjs
       - name: Validate add-on metadata
         run: |
           python -m json.tool e_control_guest/config.json >/dev/null
@@ -58,3 +62,9 @@ jobs:
         run: |
           base=$(python -c "import json; print(json.load(open('e_control_guest/build.json'))['build_from']['i386'])")
           docker build --platform linux/386 --build-arg BUILD_FROM="$base" --tag e-control-guest:i386-candidate e_control_guest
+      - name: Check audit runtime on all architectures without network or device access
+        run: |
+          for spec in 'amd64 linux/amd64' 'aarch64 linux/arm64' 'armv7 linux/arm/v7' 'armhf linux/arm/v6' 'i386 linux/386'; do
+            set -- $spec
+            docker run --rm --platform "$2" --network none --read-only --tmpfs /tmp:rw,mode=1777 --entrypoint python3 "e-control-guest:$1-candidate" -c "import tempfile;from pathlib import Path;from app.audit import AuditLog;from app.origin import COUNTRIES;t=tempfile.TemporaryDirectory();a=AuditLog(Path(t.name)/'audit.db',b's'*32);a.append(actor_type='synthetic',action='login',outcome='allowed');assert a.page()['total']==1 and a.verify()==(True,None);assert len(COUNTRIES)==249;print('Audit runtime PASS');t.cleanup()"
+          done

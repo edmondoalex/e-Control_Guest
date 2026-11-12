@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import ipaddress
 import secrets
 from dataclasses import dataclass
 
@@ -14,6 +13,7 @@ from .crypto import SecretStore, SessionSigner
 from .dashboard_client import HomeAssistantDashboardClient
 from .rate_limit import SlidingWindowLimiter
 from .settings import Settings
+from .origin import request_origin
 from .storage import GuestStore
 
 
@@ -29,21 +29,12 @@ class Runtime:
     admin_csrf: str
     identity_key: bytes
 
+    def request_origin(self, request: Request) -> dict:
+        return request_origin(request, self.settings)
+
     def network_id(self, request: Request) -> str:
-        address = request.client.host if request.client else "unknown"
-        try:
-            peer = ipaddress.ip_address(address)
-            trusted = any(peer in ipaddress.ip_network(cidr, strict=False)
-                          for cidr in self.settings.trusted_proxy_cidrs)
-        except ValueError:
-            trusted = False
-        if trusted:
-            forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
-            try:
-                address = str(ipaddress.ip_address(forwarded))
-            except ValueError:
-                pass
-        return hmac.new(self.identity_key, address.encode("utf-8"), hashlib.sha256).hexdigest()[:24]
+        client = self.request_origin(request)["client_ip"] or "unknown"
+        return hmac.new(self.identity_key, client.encode("utf-8"), hashlib.sha256).hexdigest()[:24]
 
     def user_agent_id(self, request: Request) -> str:
         value = request.headers.get("user-agent", "")[:500]

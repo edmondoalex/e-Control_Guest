@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -448,16 +448,31 @@ def create_admin_app(runtime: Runtime) -> FastAPI:
                 "fragment_url": f"{runtime.settings.guest_base_url}/guest-access#token={token}"}
 
     @app.get("/api/admin/audit", dependencies=[Depends(require_ingress)])
-    async def audit(limit: int = 200):
-        valid, broken_at = runtime.audit.verify()
-        events = runtime.audit.recent(limit)
-        for event in events:
-            if event["actor_type"] != "guest" or event["metadata"].get("label"):
-                continue
-            label = runtime.store.share_label_for_session(event.get("session_id", ""))
-            if label:
-                event["metadata"]["label"] = label
-        return {"valid": valid, "broken_at": broken_at, "events": events,
-                "stats": runtime.audit.stats()}
+    def audit(page: int = Query(1, ge=1, le=10000),
+              snapshot_seq: int | None = Query(None, ge=0, le=9223372036854775807),
+              q: str = Query("", max_length=200),
+              limit: int = Query(100, ge=1, le=1000)):
+        # Legacy limit is accepted, but no request returns more than 100 rows.
+        # The sync endpoint runs the integrity/search work in FastAPI's worker
+        # pool rather than blocking the Guest request event loop.
+        query = q.strip().casefold()
+        labels = {
+            "profile_create": "Ha creato un profilo", "profile_status": "Ha cambiato lo stato del profilo",
+            "card_import": "Ha importato una scheda", "card_delete": "Ha rimosso una scheda",
+            "permissions_update": "Ha modificato i permessi", "permissions_update_all": "Ha salvato tutti i permessi",
+            "content_export": "Ha esportato contenuto e permessi", "content_import": "Ha caricato contenuto e permessi",
+            "share_create": "Ha creato un link Guest", "share_update": "Ha modificato durata o sessioni del link",
+            "share_sessions_revoke": "Ha chiuso le sessioni attive", "share_revoke": "Ha revocato un link Guest",
+            "login": "Ha effettuato l’accesso", "logout": "Ha terminato la sessione",
+            "state_read": "Ha letto lo stato", "dashboard_view": "Ha visualizzato la dashboard",
+            "command_request": "Ha richiesto un comando", "command_readback": "Comando confermato da Home Assistant",
+        }
+        result = runtime.audit.page(
+            page=page, snapshot_seq=snapshot_seq, query=query, labels_database=runtime.store.database,
+            actions=tuple(code for code, label in labels.items() if query and query in label.casefold()),
+            outcomes=tuple(code for code, label in {"allowed": "Riuscito", "denied": "Negato", "error": "Errore"}.items()
+                           if query and query in label.casefold()),
+        )
+        return {**result, "stats": runtime.audit.stats()}
 
     return app

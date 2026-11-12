@@ -65,10 +65,27 @@ dominio o un servizio Home Assistant arbitrario.
 - `session_idle_minutes`: inattivita massima prima di liberare automaticamente
   lo slot, da 1 a 60 minuti (default 3); un heartbeat dedicato mantiene attiva
   la dashboard aperta anche con polling dati piu lento;
-- `audit_retention_days`: riserva per la politica di conservazione; la RC non
-  elimina automaticamente eventi;
+- `audit_retention_days`: giorni di conservazione del registro; la potatura
+  conserva un'ancora firmata per verificare la catena residua;
+- `audit_max_events`: tetto massimo di eventi conservati, default 100000;
 - `trusted_proxy_cidrs`: proxy autorizzati a fornire `X-Forwarded-For`. Se il
-  peer non appartiene a queste reti, l'header viene ignorato.
+  peer non appartiene a queste reti, l'header viene ignorato. La catena viene
+  letta da destra fino al primo indirizzo non fidato, non dal primo valore
+  liberamente inseribile dal visitatore. Catene malformate vengono ignorate;
+- `cloudflare_proxy_cidrs`: elenco separato dei soli connector Cloudflare
+  autorizzati a fornire IP e Paese. Default vuoto: non deduce la fiducia dal
+  nome dell'header. Usa preferibilmente l'IP esatto del connector con `/32`
+  (IPv4) o `/128` (IPv6), non l'intera LAN/rete delle APP. Non inserire
+  `0.0.0.0/0` o `::/0`: non sono accettati come proxy fidati.
+
+Per il Paese, sul percorso Cloudflare deve essere abilitata la Managed Transform
+**Add visitor location headers**, che fornisce `CF-IPCountry`. Autorizza il
+connector soltanto se l'origine riceve questi header attraverso il tunnel
+controllato, senza percorsi alternativi che possano falsificarli. Eventuali
+proxy intermedi devono preservare o sovrascrivere correttamente gli header.
+Non sono supportate attribuzioni geografiche tramite Worker subrequest.
+Fonte: [header Cloudflare](https://developers.cloudflare.com/fundamentals/reference/http-headers/).
+L'APP non cambia Cloudflare o firewall e non aggiunge automaticamente reti fidate.
 
 ## Registro e revoca
 
@@ -76,6 +93,29 @@ Il pannello mostra gli eventi con esito. Il database conserva visite, letture,
 login riusciti o negati, controlli sessione, comandi richiesti e stato letto
 dopo il comando. PIN, cookie e token sono rimossi dai metadati di audit. La
 verifica della catena segnala modifiche retroattive al registro.
+
+Il registro amministrativo mostra **IP provenienza** e **Paese** dopo Dettagli.
+Questi dati sono firmati nei metadati dei nuovi eventi, inclusi accessi riusciti
+e negati, e non sono esposti dal portale Guest. IP e Paese dei vecchi eventi
+non vengono ricostruiti dall'identificatore HMAC: restano non registrati/non
+disponibili e la catena storica non viene riscritta. Il titolo del campo IP
+indica se il dato viene dal peer, da un proxy fidato o dal connector Cloudflare.
+Se il proxy non e configurato, si vede soltanto l'IP del peer: non rappresenta
+necessariamente l'IP originale del visitatore. Il Paese e indicativo dell'IP,
+non certifica identita o posizione fisica (VPN/proxy possono modificarlo).
+Reti locali, Paese ignoto e rete Tor sono distinti. Nessun IP viene inviato a
+servizi di geolocalizzazione esterni. I dati seguono retention e limiti del
+registro configurati dall'amministratore.
+
+La consultazione e paginata lato server: **100 righe per pagina**, con Prima,
+Precedente, Successiva e Ultima e conteggio delle righe trovate. La ricerca
+copre tutto lo storico conservato, compresi eventi oltre i primi1000; per il
+Paese puoi cercare il codice ISO mostrato tra parentesi (es. IT). Durante la
+navigazione uno snapshot impedisce ai nuovi eventi di spostare le pagine.
+**Aggiorna** o una nuova ricerca ripartono dalla situazione piu recente; la
+conservazione puo comunque rimuovere eventi scaduti. Nessun evento viene perso
+per effetto della sola paginazione. Verifica integrita e dimensioni continuano
+a riferirsi al registro completo, non solo alle100 righe visibili.
 
 Revocando un link vengono revocate anche tutte le sue sessioni. Disattivando un
 profilo o cambiandone schede e permessi, le sessioni della revisione precedente

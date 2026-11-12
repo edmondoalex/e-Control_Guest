@@ -30,6 +30,7 @@ istruzioni sono in [`e_control_guest/DOCS.md`](e_control_guest/DOCS.md).
 python -m pip install -r e_control_guest/requirements-dev.txt
 python -m pytest -q
 python -m compileall -q e_control_guest/app e_control_guest/tests
+node --test e_control_guest/tests/test_audit_ui.cjs
 ```
 
-La CI esegue anche la build completa dell'immagine `linux/amd64`.
+La CI esegue anche le build complete `amd64`, `aarch64`, `armv7`, `armhf`, `i386`.

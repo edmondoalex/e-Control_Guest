@@ -13,9 +13,11 @@ from .runtime import build_runtime
 async def main() -> None:
     runtime = build_runtime()
     admin = uvicorn.Server(uvicorn.Config(create_admin_app(runtime), host="0.0.0.0",
-                                         port=runtime.settings.admin_port, access_log=False))
+                                         port=runtime.settings.admin_port, access_log=False,
+                                         proxy_headers=False))
     guest = uvicorn.Server(uvicorn.Config(create_guest_app(runtime), host="0.0.0.0",
-                                         port=runtime.settings.guest_port, access_log=False))
+                                         port=runtime.settings.guest_port, access_log=False,
+                                         proxy_headers=False))
     admin.install_signal_handlers = lambda: None
     guest.install_signal_handlers = lambda: None
     loop = asyncio.get_running_loop()

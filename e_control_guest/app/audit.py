@@ -5,6 +5,8 @@ import hmac
 import json
 import sqlite3
 import threading
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -39,6 +41,7 @@ class AuditLog:
         self.max_events = max(1000, int(max_events))
         self._lock = threading.RLock()
         self._maintenance_day = ""
+        self._request_origin = ContextVar("audit_request_origin", default=None)
         database.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.execute("""
@@ -104,6 +107,9 @@ class AuditLog:
         if self._maintenance_day != today:
             self.prune()
         clean = _sanitize(metadata or {})
+        origin = self._request_origin.get()
+        if origin is not None:
+            clean["origin"] = dict(origin)
         timestamp = occurred_at or datetime.now(timezone.utc).isoformat()
         with self._lock, self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -143,10 +149,14 @@ class AuditLog:
 
     def verify(self) -> tuple[bool, int | None]:
         with self._connect() as connection:
-            anchor_seq, previous_hash, anchor_valid = self._anchor(connection)
-            if not anchor_valid:
-                return False, anchor_seq
-            rows = connection.execute("SELECT * FROM audit_events ORDER BY seq").fetchall()
+            connection.execute("BEGIN")
+            return self._verify_connection(connection)
+
+    def _verify_connection(self, connection) -> tuple[bool, int | None]:
+        anchor_seq, previous_hash, anchor_valid = self._anchor(connection)
+        if not anchor_valid:
+            return False, anchor_seq
+        rows = connection.execute("SELECT * FROM audit_events ORDER BY seq")
         for expected_seq, row in enumerate(rows, anchor_seq + 1):
             metadata = json.loads(row["metadata_json"])
             body = {
@@ -228,3 +238,59 @@ class AuditLog:
                 "SELECT * FROM audit_events ORDER BY seq DESC LIMIT ?", (limit,)
             ).fetchall()
         return [{**dict(row), "metadata": json.loads(row["metadata_json"])} for row in rows]
+
+    @contextmanager
+    def request_context(self, origin):
+        token = self._request_origin.set(dict(origin))
+        try:
+            yield
+        finally:
+            self._request_origin.reset(token)
+
+    def page(self, *, page=1, snapshot_seq=None, query="", labels_database=None,
+             actions=(), outcomes=()):
+        """Bounded read of all retained events; new appends do not shift pages."""
+        with self._connect() as connection:
+            labels_join, label_text = "", "''"
+            if labels_database is not None:
+                connection.execute("ATTACH DATABASE ? AS labels", (str(labels_database),))
+                labels_join = (" LEFT JOIN labels.sessions s ON s.id=a.session_id AND a.actor_type='guest'"
+                               " LEFT JOIN labels.shares h ON h.id=s.share_id")
+                label_text = "COALESCE(h.label,'')"
+            connection.execute("BEGIN")
+            valid, broken_at = self._verify_connection(connection)
+            newest = int(connection.execute("SELECT COALESCE(MAX(seq),0) FROM audit_events").fetchone()[0])
+            snapshot_seq = newest if snapshot_seq is None else min(newest, max(0, int(snapshot_seq)))
+            where, params = "a.seq<=?", [snapshot_seq]
+            if query:
+                connection.create_function("casefold", 1, lambda value: str(value or "").casefold(),
+                                           deterministic=True)
+                searchable = ("a.occurred_at||' '||a.actor_type||' '||a.actor_id||' '||a.session_id||' '||"
+                              "a.action||' '||a.resource||' '||a.outcome||' '||a.metadata_json||' '||" + label_text)
+                conditions = ["instr(casefold(" + searchable + "),?)>0"]
+                params.append(query.casefold())
+                for column, values in (("action", actions), ("outcome", outcomes)):
+                    if values:
+                        conditions.append("a." + column + " IN (" + ",".join("?" for _ in values) + ")")
+                        params.extend(values)
+                where += " AND (" + " OR ".join(conditions) + ")"
+            base = " FROM audit_events a" + labels_join + " WHERE " + where
+            count_base = base if query else " FROM audit_events a WHERE " + where
+            total = int(connection.execute("SELECT COUNT(*)" + count_base, params).fetchone()[0])
+            pages = max(1, (total + 99) // 100)
+            page = max(1, min(pages, int(page)))
+            rows = connection.execute("SELECT a.*," + label_text + " AS resolved_label" + base + " ORDER BY a.seq DESC LIMIT 100 OFFSET ?",
+                                      [*params, (page - 1) * 100]).fetchall()
+        events = []
+        for row in rows:
+            event = dict(row)
+            label = event.pop("resolved_label", "")
+            event["metadata"] = json.loads(event["metadata_json"])
+            # Presentation-only enrichment, already used by RC34. Do not
+            # rewrite the original JSON/hash or open one connection per row.
+            if event["actor_type"] == "guest" and not event["metadata"].get("label") and label:
+                event["metadata"]["label"] = label
+            events.append(event)
+        return {"events": events,
+                "page": page, "pages": pages, "page_size": 100, "total": total,
+                "snapshot_seq": snapshot_seq, "valid": valid, "broken_at": broken_at}

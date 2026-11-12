@@ -19,6 +19,7 @@ class Settings:
     guest_base_url: str = ""
     allow_insecure_local_http: bool = False
     trusted_proxy_cidrs: tuple[str, ...] = ()
+    cloudflare_proxy_cidrs: tuple[str, ...] = ()
     supervisor_url: str = "http://supervisor"
     supervisor_token: str = ""
     development_admin: bool = False
@@ -51,6 +52,10 @@ class Settings:
             allow_insecure_local_http=options.get("allow_insecure_local_http") is True,
             trusted_proxy_cidrs=tuple(
                 str(item).strip() for item in options.get("trusted_proxy_cidrs", [])
+                if isinstance(item, str) and item.strip()
+            ),
+            cloudflare_proxy_cidrs=tuple(
+                str(item).strip() for item in options.get("cloudflare_proxy_cidrs", [])
                 if isinstance(item, str) and item.strip()
             ),
             supervisor_url=os.environ.get("SUPERVISOR_URL", "http://supervisor").rstrip("/"),

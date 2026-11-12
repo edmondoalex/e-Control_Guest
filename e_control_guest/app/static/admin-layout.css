@@ -11,6 +11,10 @@
 .share-actions { margin-top: 10px; }
 .permission-tools { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(5, auto); gap: 10px; margin-bottom: 16px; }
 .audit-tools { display: grid; grid-template-columns: minmax(260px, 1fr) auto auto auto; gap: 10px; align-items: center; }
+.audit-pagination { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
+.audit-pagination p { margin: 0; flex: 1 1 240px; }
+#audit-error { min-height: 1.4em; color: #ff7187; }
+#audit-table td { overflow-wrap: anywhere; }
 .permission-card { padding: 0; overflow: hidden; }
 .permission-card > summary { display: flex; align-items: center; gap: 12px; padding: 16px 18px; cursor: pointer; list-style: none; }
 .permission-card > summary::-webkit-details-marker { display: none; }

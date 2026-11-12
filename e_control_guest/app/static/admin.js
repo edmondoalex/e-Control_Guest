@@ -1,4 +1,4 @@
-const S={csrf:'',catalog:{},profile:null,manual:null,candidates:[],auditEvents:[]};
+const S={csrf:'',catalog:{},profile:null,manual:null,candidates:[],auditEvents:[],auditPage:1,auditPages:1,auditTotal:0,auditSnapshot:null,auditBusy:false,auditEpoch:0,auditAbort:null,auditTimer:null};
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toast(message,bad=false){const e=$('#toast');e.textContent=message;e.style.borderColor=bad?'#ff4964':'#26c6da';e.classList.add('show');setTimeout(()=>e.classList.remove('show'),3500)}
 async function api(path,opt={}){opt.headers={...(opt.headers||{})};if(opt.body){opt.headers['Content-Type']='application/json';opt.headers['X-eControl-CSRF']=S.csrf}const r=await fetch(path,opt);const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.detail||`HTTP ${r.status}`);return data}
@@ -24,8 +24,41 @@ async function recoverLink(shareId,copy){try{const value=await api(`api/admin/sh
 function actionLabel(action){return ({profile_create:'Ha creato un profilo',profile_status:'Ha cambiato lo stato del profilo',card_import:'Ha importato una scheda',card_delete:'Ha rimosso una scheda',permissions_update:'Ha modificato i permessi',permissions_update_all:'Ha salvato tutti i permessi',content_export:'Ha esportato contenuto e permessi',content_import:'Ha caricato contenuto e permessi',share_create:'Ha creato un link Guest',share_update:'Ha modificato durata o sessioni del link',share_sessions_revoke:'Ha chiuso le sessioni attive',share_revoke:'Ha revocato un link Guest',login:'Ha effettuato l’accesso',logout:'Ha terminato la sessione',state_read:'Ha letto lo stato',dashboard_view:'Ha visualizzato la dashboard',command_request:'Ha richiesto un comando',command_readback:'Comando confermato da Home Assistant'}[action]||action)}
 function commandText(m){if(!m.action)return '';const names={turn_on:'accensione',turn_off:'spegnimento',press:'pressione pulsante',set_temperature:'impostazione temperatura',set_hvac_mode:'modalità termostato',set_brightness:'luminosità',open_cover:'apertura',close_cover:'chiusura',stop_cover:'arresto',set_position:'posizione'};return `${names[m.action]||m.action}${m.value!==null&&m.value!==undefined?`: ${m.value}${m.action==='set_temperature'?' °C':''}`:''}`}
 function auditDetails(e){const m=e.metadata||{},entities=Array.isArray(m.entities)?m.entities.length:Number(m.entities);return [m.entity_name&&`dispositivo: ${m.entity_name}`,commandText(m),m.state&&`stato finale: ${m.state}`,m.reason&&`motivo: ${m.reason}`,m.name&&`profilo: ${m.name}`,Number.isFinite(entities)&&entities>0&&`${entities} dispositivi`,m.card_count&&`${m.card_count} schede`,m.entity_count&&`${m.entity_count} dispositivi`,m.sessions_revoked&&`${m.sessions_revoked} sessioni revocate`,!m.entity_name&&e.resource&&`rif: ${e.resource}`].filter(Boolean).join(' · ')}
-function renderAudit(){const query=($('#audit-filter').value||'').trim().toLowerCase(),rows=S.auditEvents.filter(e=>{const m=e.metadata||{},who=e.actor_type==='guest'?(m.label||`Guest ${e.session_id?.slice(0,8)||''}`):(e.actor_id||e.actor_type||'sistema'),outcome=e.outcome==='allowed'?'Riuscito':e.outcome==='denied'?'Negato':'Errore';return !query||[new Date(e.occurred_at).toLocaleString(),who,actionLabel(e.action),auditDetails(e),outcome].join(' ').toLowerCase().includes(query)});$('#audit').innerHTML=rows.map(e=>{const m=e.metadata||{},who=e.actor_type==='guest'?(m.label||`Guest ${e.session_id?.slice(0,8)||''}`):(e.actor_id||e.actor_type||'sistema');return `<tr><td>${esc(new Date(e.occurred_at).toLocaleString())}</td><td>${esc(who)}</td><td>${esc(actionLabel(e.action))}</td><td>${esc(auditDetails(e))}</td><td class="${e.outcome==='allowed'?'ok':e.outcome==='denied'?'warn':'error'}">${esc(e.outcome==='allowed'?'Riuscito':e.outcome==='denied'?'Negato':'Errore')}</td></tr>`}).join('')||'<tr><td colspan="5" class="muted">Nessun evento corrispondente.</td></tr>'}
-async function audit(){const d=await api('api/admin/audit?limit=1000');S.auditEvents=d.events;$('#audit-state').textContent=d.valid?'Catena integra':'CATENA ALTERATA';$('#audit-state').className=d.valid?'ok':'error';const s=d.stats||{},mb=((s.bytes||0)/1048576).toFixed(1);$('#audit-size').textContent=`${s.events||0} eventi · ${mb} MB · ${s.retention_days||'?'} giorni · max ${s.max_events||'?'}`;renderAudit()}
+function auditOrigin(e){
+ const origin=e.metadata?.origin||{},ip=typeof origin.client_ip==='string'?origin.client_ip:'',code=typeof origin.country_code==='string'?origin.country_code:'';
+ let country='Non disponibile';
+ if(code==='T1')country='Rete Tor';
+ else if(/^[A-Z]{2}$/.test(code)){try{country=`${new Intl.DisplayNames(['it'],{type:'region'}).of(code)} (${code})`}catch{country=code}}
+ else if(origin.network_kind==='local')country='Rete locale';
+ const source={peer:'Peer diretto',forwarded:'Proxy fidato · X-Forwarded-For',cloudflare:'Connector Cloudflare fidato',proxy_unresolved:'IP del proxy: origine visitatore non disponibile'}[origin.ip_source]||'Origine non registrata';
+ return {ip:ip||'Non registrato',country,source};
+}
+function auditPager(){
+ for(const id of ['audit-first','audit-previous'])$("#"+id).disabled=S.auditBusy||S.auditPage<=1;
+ for(const id of ['audit-next','audit-last'])$("#"+id).disabled=S.auditBusy||S.auditPage>=S.auditPages;
+ $('#refresh-audit').disabled=S.auditBusy;
+ $('#audit-table').setAttribute('aria-busy',String(S.auditBusy));
+}
+function renderAudit(){
+ $('#audit').innerHTML=S.auditEvents.slice(0,100).map(e=>{const m=e.metadata||{},who=e.actor_type==='guest'?(m.label||`Guest ${e.session_id?.slice(0,8)||''}`):(e.actor_id||e.actor_type||'sistema'),origin=auditOrigin(e);return `<tr><td>${esc(new Date(e.occurred_at).toLocaleString())}</td><td>${esc(who)}</td><td>${esc(actionLabel(e.action))}</td><td>${esc(auditDetails(e))}</td><td title="${esc(origin.source)}">${esc(origin.ip)}</td><td title="Paese indicativo dell’IP, non identità della persona">${esc(origin.country)}</td><td class="${e.outcome==='allowed'?'ok':e.outcome==='denied'?'warn':'error'}">${esc(e.outcome==='allowed'?'Riuscito':e.outcome==='denied'?'Negato':'Errore')}</td></tr>`}).join('')||'<tr><td colspan="7" class="muted">Nessun evento corrispondente.</td></tr>';
+ const start=S.auditTotal?(S.auditPage-1)*100+1:0,end=Math.min(S.auditPage*100,S.auditTotal);
+ $('#audit-page-info').textContent=`Pagina ${S.auditPage} di ${S.auditPages} · righe ${start}–${end} di ${S.auditTotal} · 100 per pagina`;
+ auditPager();
+}
+async function audit(page=1,reset=true){
+ clearTimeout(S.auditTimer);const epoch=++S.auditEpoch;S.auditAbort?.abort();const controller=new AbortController();S.auditAbort=controller;S.auditBusy=true;
+ if(reset)S.auditSnapshot=null;
+ const params=new URLSearchParams({page:String(page),q:($('#audit-filter').value||'').trim().slice(0,200)});
+ if(S.auditSnapshot!==null)params.set('snapshot_seq',String(S.auditSnapshot));
+ S.auditEvents=[];renderAudit();$('#audit-page-info').textContent='Caricamento del registro…';$('#audit-error').textContent='';
+ const timeout=setTimeout(()=>controller.abort(),30000);
+ try{const d=await api('api/admin/audit?'+params,{signal:controller.signal,cache:'no-store'});if(epoch!==S.auditEpoch)return;
+  if(!Array.isArray(d.events)||d.events.length>100||d.page_size!==100||!Number.isInteger(d.page)||!Number.isInteger(d.pages)||!Number.isInteger(d.total)||!Number.isSafeInteger(d.snapshot_seq)||d.page<1||d.pages<1||d.page>d.pages||d.total<0||d.snapshot_seq<0)throw Error('Risposta del registro non valida');
+  S.auditEvents=d.events;S.auditPage=d.page;S.auditPages=d.pages;S.auditTotal=d.total;S.auditSnapshot=d.snapshot_seq;
+  $('#audit-state').textContent=d.valid?'Catena integra':'CATENA ALTERATA';$('#audit-state').className=d.valid?'ok':'error';const s=d.stats||{},mb=((s.bytes||0)/1048576).toFixed(1);$('#audit-size').textContent=`${s.events||0} eventi · ${mb} MB · ${s.retention_days||'?'} giorni · max ${s.max_events||'?'}`;renderAudit();
+ }catch(e){if(epoch===S.auditEpoch){S.auditEvents=[];S.auditPage=1;S.auditPages=1;S.auditTotal=0;S.auditSnapshot=null;renderAudit();$('#audit-state').textContent='Verifica non disponibile';$('#audit-state').className='muted';$('#audit-error').textContent='Registro non caricato: '+(e.name==='AbortError'?'tempo scaduto':e.message)}}
+ finally{clearTimeout(timeout);if(epoch===S.auditEpoch){S.auditBusy=false;auditPager()}}
+}
 $('#create-profile').onclick=async()=>{const name=$('#profile-name').value.trim();if(!name)return;const p=await api('api/admin/profiles',{method:'POST',body:JSON.stringify({name})});$('#profile-name').value='';await profiles();await selectProfile(p.id)};
 $('#load-cards').onclick=async()=>{const d=$('#dashboards').value;try{prepareCandidates((await api(`api/admin/import/dashboards/${encodeURIComponent(d)}/cards`)).cards)}catch(e){toast(e.message,true)}};
 $('#inspect-json').onclick=async()=>{try{const config=JSON.parse($('#manual-json').value);prepareCandidates((await api('api/admin/import/inspect',{method:'POST',body:JSON.stringify({dashboard:'manual',config})})).cards,config)}catch(e){toast(e.message,true)}};
@@ -39,4 +72,8 @@ $('#import-content').onclick=()=>$('#import-content-file').click();
 $('#import-content-file').onchange=event=>importContent(event.target.files[0]);
 $('#share-permanent').onchange=()=>{$('#share-minutes').disabled=$('#share-permanent').checked};
 $('#create-share').onclick=async()=>{if(!S.profile)return toast('Seleziona un profilo',true);try{const label=$('#share-label').value.trim(),permanent=$('#share-permanent').checked,pin=$('#share-pin').value||null;if(!label)return toast('Inserisci il nome ospite o una descrizione',true);if(permanent&&!pin)return toast('Inserisci un PIN per il link senza scadenza',true);const d=await api(`api/admin/profiles/${S.profile}/shares`,{method:'POST',body:JSON.stringify({label,pin,valid_minutes:permanent?null:+$('#share-minutes').value,max_sessions:+$('#share-sessions').value})});$('#new-link').innerHTML=`<p class="muted">Potrai recuperare questo link dall'elenco sottostante.</p><div class="linkbox">${esc(d.fragment_url)}</div><button id="copy-link">Copia link</button>`;$('#copy-link').onclick=async()=>{try{await copyText(d.fragment_url);toast('Link copiato negli appunti')}catch(e){toast(e.message,true)}};await selectProfile(S.profile)}catch(e){toast(e.message,true)}};
-$('#audit-filter').oninput=renderAudit;$('#refresh-audit').onclick=audit;init().catch(e=>toast(e.message,true));
+$('#audit-filter').oninput=()=>{++S.auditEpoch;S.auditAbort?.abort();clearTimeout(S.auditTimer);S.auditBusy=true;S.auditEvents=[];renderAudit();$('#audit-page-info').textContent='Ricerca nel registro…';S.auditTimer=setTimeout(()=>audit(1,true),300)};
+$('#refresh-audit').onclick=()=>audit(1,true);
+$('#audit-first').onclick=()=>audit(1,false);$('#audit-previous').onclick=()=>audit(S.auditPage-1,false);
+$('#audit-next').onclick=()=>audit(S.auditPage+1,false);$('#audit-last').onclick=()=>audit(S.auditPages,false);
+init().catch(e=>toast(e.message,true));

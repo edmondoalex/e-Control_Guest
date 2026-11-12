@@ -1,4 +1,31 @@
-## Handoff corrente - RC34 pubblicata e qualificata (11/11/2026)
+## Handoff corrente - RC35 implementata, qualifica pubblicazione da completare (12/11/2026)
+
+CHANGE065 richiesta user: IP provenienza e Paese dopo Dettagli, pagine100 righe.
+Implementata nel clone owner isolato change065-guest-audit-local, baseline6d781da;
+originale non modificato nel runtime. Gate specifico user: pubblica Guest dopo
+i test; nessuna installazione/riavvio/accesso live/comando dispositivo.
+
+Origine nuovi eventi via context request-local, socket reale e header solo da
+proxy espliciti; XFF destra/primo non fidato, CIDR0 non accettati. Cloudflare
+IP/Paese solo cloudflare_proxy_cidrs dedicato defaultvuoto, headerIP validato,
+ISO/Tor/ignoto distinti, nessun lookupesterno. Uvicorn proxy_headersFalse evita
+riscrittura peer prima dei gate Ingress. IP metadato Paese approssimativo, non
+identita o posizione certa. Dati legacy non retrocalcolati, catena non riscritta.
+
+API soloIngress massimo100righe, ricerca globale anche oltre1000 e per label
+legacy, snapshotseq evita salti da nuovi eventi; verifica integrita nello stesso
+snapshot SQLite e streaming, senza caricare intera catena in RAM. Label join
+evita una connessione per riga. UI7colonne/paginatore/conteggi/debounce/raceguard/
+errore e cache065. Retention, sessioni, CSRF e permessi invariati.
+
+51 testPython/6UI locali PASS, compileall/Node/JSON PASS; nuove regressioni prima
+rosse poi verdi. CI estesa a testUI e smoke audit senza rete su5architetture.
+Config candidata0.1.0-rc35; commit/push/tag/release/CI da eseguire, nessun esito
+anticipato. Paese richiede configurazione esplicita connector e ManagedTransform
+CloudflareCFIPCountry; nessuna impostazione reale cambiata. Coordinamento
+CHANGE065/workorder/sync E-Manager. Non dichiarare installazione/collaudo reale.
+
+## Handoff precedente - RC34 pubblicata e qualificata (11/11/2026)
 
 Pubblicato il ciclo sessione/PWA richiesto. Nuova opzione
 `session_idle_minutes` default 3: le sessioni oltre soglia vengono revocate e

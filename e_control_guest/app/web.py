@@ -8,6 +8,10 @@ from fastapi import FastAPI, Request
 def install_http_guards(app: FastAPI, runtime, *, surface: str) -> None:
     @app.middleware("http")
     async def security_and_audit(request: Request, call_next):
+        with runtime.audit.request_context(runtime.request_origin(request)):
+            return await guarded_request(request, call_next)
+
+    async def guarded_request(request: Request, call_next):
         request_id = request.headers.get("x-request-id", "")
         if not request_id or len(request_id) > 100:
             request_id = secrets.token_hex(12)
