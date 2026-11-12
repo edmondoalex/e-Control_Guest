@@ -108,8 +108,26 @@ def request_origin(request, settings):
                 # a visitor. Never label a connector as the original client.
                 if not trusted(candidate, cidrs):
                     client, source = candidate, "forwarded"
+    observation = {}
+    if proof_failed and not request.headers.get("cf-worker"):
+        # These values are useful operational evidence, but a shared HA
+        # gateway cannot authenticate them. Never feed them into client_ip:
+        # Runtime.network_id and rate limiting must keep using the socket peer.
+        observed = address(single_header(request, "cf-connecting-ip"))
+        if observed is not None and observed.is_global:
+            observation = {
+                "observed_client_ip": str(observed),
+                "observation_source": "cloudflare_headers_unverified",
+            }
+            code = single_header(request, "cf-ipcountry").upper()
+            if code in COUNTRIES or code == "T1":
+                observation["observed_country_code"] = code
+            if code in COUNTRIES:
+                observed_city = location_header(request, "cf-ipcity")
+                if observed_city:
+                    observation["observed_city"] = observed_city
     kind = "unknown" if client is None else "public" if client.is_global else "local"
     return {"client_ip": str(client) if client is not None else "",
             "ip_source": source, "country_code": country,
             "country_source": "cloudflare" if country else "", "network_kind": kind,
-            "city": city, "city_source": "cloudflare" if city else ""}
+            "city": city, "city_source": "cloudflare" if city else "", **observation}

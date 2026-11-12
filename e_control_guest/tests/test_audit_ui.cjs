@@ -26,7 +26,7 @@ test('new columns follow details, controls are accessible, and assets are cache-
  assert.ok(html.indexOf('>Città indicativa<')<html.indexOf('>Esito<'));
  for(const id of ['first','previous','next','last'])assert.ok(html.includes('id="audit-'+id+'"'));
  assert.match(html,/aria-label="Pagine del registro"/);assert.match(html,/id="audit-error" role="alert"/);
- assert.match(html,/admin.js\?v=20261112-catalog066/);assert.doesNotMatch(source,/audit\?limit=1000/);
+ assert.match(html,/admin.js\?v=20261112-origin067/);assert.doesNotMatch(source,/audit\?limit=1000/);
 });
 
 test('renders at most100 rows, legacy data is not invented and all origin data is escaped',()=>{
@@ -51,6 +51,15 @@ test('internal peer is visibly distinguished from verified visitor IP without ch
  const origin={ip_source:'cloudflare',city_source:'cloudflare',city:'Città sintetica'};
  assert.equal(h.api.auditOrigin({metadata:{origin}}).city,'Città sintetica');
  assert.equal(h.api.auditOrigin({metadata:{origin:{...origin,ip_source:'peer'}}}).city,'Non disponibile');
+});
+
+test('unverified forwarded observation is visible but never presented as trusted',()=>{
+ const h=harness(),e=event(2);e.metadata.origin={client_ip:'172.30.32.1',network_kind:'local',ip_source:'proxy_unresolved',
+  observed_client_ip:'1.1.1.1',observed_country_code:'IT',observed_city:'Milano',observation_source:'cloudflare_headers_unverified'};
+ const before=JSON.stringify(e);h.api.S.auditEvents=[e];h.api.renderAudit();const body=h.node('#audit').innerHTML;
+ assert.match(body,/1\.1\.1\.1/);assert.match(body,/collegamento 172\.30\.32\.1/);
+ assert.match(body,/non verificato/);assert.match(body,/Italia \(IT\)/);assert.match(body,/Milano/);
+ assert.doesNotMatch(body,/connector Cloudflare fidato/);assert.equal(JSON.stringify(e),before);
 });
 
 test('navigation fetches only one page and keeps snapshot; refresh resets it',async()=>{

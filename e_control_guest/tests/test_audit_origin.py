@@ -46,6 +46,9 @@ def test_shared_gateway_requires_secret_proof_before_original_ip_and_city(tmp_pa
     else:
         assert origin['client_ip']=='172.30.32.1' and not origin['city'] and not origin['country_code']
         assert origin['ip_source']=='proxy_unresolved'
+        assert origin['observed_client_ip']=='1.1.1.1'
+        assert origin['observed_country_code']=='IT'
+        assert origin['observed_city']=='Città sintetica'
     assert 's'*32 not in json.dumps(origin) and 's'*32 not in repr(settings)
 
 
@@ -53,6 +56,26 @@ def test_shared_gateway_without_configured_secret_cannot_supply_identity(tmp_pat
     runtime=build_runtime(Settings(data_dir=tmp_path,cloudflare_proxy_cidrs=('172.30.32.1/32',)))
     result=runtime.request_origin(request('172.30.32.1',[('cf-connecting-ip','1.1.1.1'),('cf-ipcountry','IT')]))
     assert result['client_ip']=='172.30.32.1' and result['ip_source']=='proxy_unresolved'
+    assert result['observed_client_ip']=='1.1.1.1'
+
+
+def test_unverified_observation_never_changes_security_network_identity(tmp_path):
+    runtime=build_runtime(Settings(data_dir=tmp_path,cloudflare_proxy_cidrs=('172.30.32.1/32',)))
+    left=request('172.30.32.1',[('cf-connecting-ip','1.1.1.1'),('cf-ipcountry','IT')])
+    right=request('172.30.32.1',[('cf-connecting-ip','8.8.8.8'),('cf-ipcountry','US')])
+    assert runtime.network_id(left)==runtime.network_id(right)
+    assert runtime.request_origin(left)['client_ip']=='172.30.32.1'
+    assert runtime.request_origin(right)['client_ip']=='172.30.32.1'
+
+
+@pytest.mark.parametrize('headers', [
+    [('cf-connecting-ip','192.168.1.4'),('cf-ipcountry','IT')],
+    [('cf-connecting-ip','1.1.1.1'),('cf-connecting-ip','8.8.8.8')],
+    [('cf-connecting-ip','1.1.1.1'),('cf-ipcountry','IT'),('cf-worker','example.test')],
+])
+def test_unverified_observation_rejects_local_duplicate_and_worker_inputs(tmp_path,headers):
+    runtime=build_runtime(Settings(data_dir=tmp_path,cloudflare_proxy_cidrs=('172.30.32.1/32',)))
+    assert 'observed_client_ip' not in runtime.request_origin(request('172.30.32.1',headers))
 
 
 def test_city_headers_are_trusted_bounded_unique_and_never_from_worker_or_direct(tmp_path):

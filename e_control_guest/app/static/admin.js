@@ -25,13 +25,14 @@ function actionLabel(action){return ({profile_create:'Ha creato un profilo',prof
 function commandText(m){if(!m.action)return '';const names={turn_on:'accensione',turn_off:'spegnimento',press:'pressione pulsante',set_temperature:'impostazione temperatura',set_hvac_mode:'modalità termostato',set_brightness:'luminosità',open_cover:'apertura',close_cover:'chiusura',stop_cover:'arresto',set_position:'posizione'};return `${names[m.action]||m.action}${m.value!==null&&m.value!==undefined?`: ${m.value}${m.action==='set_temperature'?' °C':''}`:''}`}
 function auditDetails(e){const m=e.metadata||{},entities=Array.isArray(m.entities)?m.entities.length:Number(m.entities);return [m.entity_name&&`dispositivo: ${m.entity_name}`,commandText(m),m.state&&`stato finale: ${m.state}`,m.reason&&`motivo: ${m.reason}`,m.name&&`profilo: ${m.name}`,Number.isFinite(entities)&&entities>0&&`${entities} dispositivi`,m.card_count&&`${m.card_count} schede`,m.entity_count&&`${m.entity_count} dispositivi`,m.sessions_revoked&&`${m.sessions_revoked} sessioni revocate`,!m.entity_name&&e.resource&&`rif: ${e.resource}`].filter(Boolean).join(' · ')}
 function auditOrigin(e){
- const origin=e.metadata?.origin||{},ip=typeof origin.client_ip==='string'?origin.client_ip:'',code=typeof origin.country_code==='string'?origin.country_code:'';
+ const origin=e.metadata?.origin||{},peerIp=typeof origin.client_ip==='string'?origin.client_ip:'',observed=origin.observation_source==='cloudflare_headers_unverified'&&typeof origin.observed_client_ip==='string'?origin.observed_client_ip:'',ip=observed||peerIp,code=typeof (observed?origin.observed_country_code:origin.country_code)==='string'?(observed?origin.observed_country_code:origin.country_code):'';
  let country='Non disponibile';
  if(code==='T1')country='Rete Tor';
  else if(/^[A-Z]{2}$/.test(code)){try{country=`${new Intl.DisplayNames(['it'],{type:'region'}).of(code)} (${code})`}catch{country=code}}
- else if(origin.network_kind==='local')country='Non rilevabile (IP interno)';
- const source=origin.ip_source==='peer'&&origin.network_kind==='local'?'IP interno del collegamento · IP pubblico ospite non rilevato':({peer:'IP del collegamento · eventuale proxy non verificato',forwarded:'IP visitatore · proxy fidato',cloudflare:'IP visitatore · connector Cloudflare fidato',proxy_unresolved:'IP del proxy · IP pubblico ospite non rilevato'}[origin.ip_source]||'Origine non registrata');
- const city=origin.ip_source==='cloudflare'&&origin.city_source==='cloudflare'&&typeof origin.city==='string'?origin.city:'';
+ else if(origin.network_kind==='local'&&!observed)country='Non rilevabile (IP interno)';
+ if(observed&&country!=='Non disponibile')country=`${country} · segnalato, non verificato`;
+ const source=observed?`IP segnalato dal proxy non verificato · collegamento ${peerIp||'non registrato'} · non usato per sicurezza`:origin.ip_source==='peer'&&origin.network_kind==='local'?'IP interno del collegamento · IP pubblico ospite non rilevato':({peer:'IP del collegamento · eventuale proxy non verificato',forwarded:'IP visitatore · proxy fidato',cloudflare:'IP visitatore · connector Cloudflare fidato',proxy_unresolved:'IP del proxy · IP pubblico ospite non rilevato'}[origin.ip_source]||'Origine non registrata');
+ const city=observed&&typeof origin.observed_city==='string'?`${origin.observed_city} · segnalata, non verificata`:origin.ip_source==='cloudflare'&&origin.city_source==='cloudflare'&&typeof origin.city==='string'?origin.city:'';
  return {ip:ip||'Non registrato',country,source,city:city||'Non disponibile'};
 }
 function auditPager(){

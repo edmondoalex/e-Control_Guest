@@ -13,6 +13,15 @@ stessa revisione; il solo push della fonte pubblica non aggiorna il catalogo.
 
 ## IP pubblico, Paese e citta attraverso Cloudflare
 
+Quando Home Assistant inoltra il traffico tramite il gateway condiviso
+`172.30.32.1` e manca la prova segreta, RC37 puo mostrare separatamente gli
+header di provenienza come **segnalati dal proxy, non verificati** se quel peer
+e stato inserito esplicitamente in `cloudflare_proxy_cidrs`. Il peer socket
+resta comunque l'origine usata per `network_id`, rate limit e sicurezza. Questa
+modalita e diagnostica: non trasforma gli header in identita attendibile e non
+inventa Paese o citta quando gli header non sono presenti. Una prova segreta
+valida continua a produrre l'origine Cloudflare verificata prevista da RC36.
+
 `CF-Connecting-IP` e gli header geografici vengono letti esclusivamente da
 connector esplicitamente autorizzati. Per la citta attivare in Cloudflare
 **Rules / Transform Rules / Managed Transforms / Add visitor location headers**:
