@@ -1,4 +1,30 @@
-## Handoff corrente - RC35 implementata, qualifica pubblicazione da completare (12/11/2026)
+## Handoff corrente - RC35 pubblicata e qualificata (12/11/2026)
+
+CHANGE065 completata nel solo clone ownerisolato. Commit ec9bb06 e tag/release
+v0.1.0-rc35 pubblicati. Run43235905869(main)/43235906560(tag) SUCCESS:
+51 Python/6UI PASS, metadati e build amd64/aarch64/armv7/armhf/i386 PASS;
+smoke audit runtime readonly/senza rete PASS su tutte5architetture. Release e
+configversion35 rilette GitHub, non draft. Nessuna installazione/riavvio/accesso
+o comando impianto eseguito. File runtime originale owner preservati.
+
+Registro con IP/Paese nuovi eventi firmati e pagine server100righe, ricerca
+globale/snapshotstabile/streaming HMAC/labeljoin. Colonne dopo Dettagli e prima
+Esito, conteggi e navigazione accessibili, raceguard/errori. Vecchi eventi
+immutati: IP/Paese precedenti non ricostruibili. Nessun lookupesterno, solo
+socket/proxy espliciti e CFspecifictrust separato defaultvuoto; metadati Paese
+non certificano identita o posizione reale. Sessioni/PWA/CSRF/permessi/retention
+invariati; Uvicorn non riscrive peer prima dei gate. Test fixtures sintetiche,
+nessun dato cliente nei file o Git, nessun test browser reale dichiarato.
+
+Prossimo user: aggiorna Guest35 dalla propria UI. Per IP/Paese dietroCloudflare
+autorizza nelle opzioni il solo connector controllato cloudflare_proxy_cidrs
+(/32 o /128, mai tuttaLAN/reteAPP) e assicurati che CF-IPCountry sia fornito
+da CloudflareManagedTransform. No configurazione reale automatica dell'agente.
+Se manca fonte Paese resta non disponibile; peer non fidato non attesta origine
+remota. Collaudo live e privacy/retention configurate restano al proprietario.
+Coordinamento centrale CHANGE065/workorder/syncEManager aggiornato.
+
+## Handoff precedente - RC35 implementata, qualifica pubblicazione da completare (12/11/2026)
 
 CHANGE065 richiesta user: IP provenienza e Paese dopo Dettagli, pagine100 righe.
 Implementata nel clone owner isolato change065-guest-audit-local, baseline6d781da;
